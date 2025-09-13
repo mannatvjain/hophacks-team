@@ -2,9 +2,15 @@
 import React, { useEffect, useRef } from "react";
 import * as d3 from "d3";
 
-export default function GraphPanel({ data, onSelect, className = "", fitSignal = 0 }) {
+export default function GraphPanel({
+  data,
+  onSelect,
+  className = "",
+  fitSignal = 0,        // animated fit-all
+  recenterSignal = 0,   // instant recenter (keep zoom)
+}) {
   const svgRef  = useRef(null);
-  const zoomRef = useRef(null); // keep the SAME zoom instance for transforms
+  const zoomRef = useRef(null); // keep the one zoom instance
 
   const ORANGE = "#f97316";
   const BLACK  = "#0f172a";
@@ -20,17 +26,16 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
     const root = svg.select(".root");
     root.selectAll("*").remove();
 
-    // robust size read
     const bb = svgRef.current.getBoundingClientRect();
     const width  = Math.max(1, bb.width  || svgRef.current.clientWidth  || 800);
     const height = Math.max(1, bb.height || svgRef.current.clientHeight || 600);
 
-    // --- marker (reverted style)
+    // --- arrow marker (reverted triangle; tip aligned with line end)
     const defs = svg.append("defs");
     defs.append("marker")
       .attr("id", "arrow")
       .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 12)            // earlier, simpler arrow
+      .attr("refX", 10)  // tip sits at line end
       .attr("refY", 0)
       .attr("markerWidth", 6)
       .attr("markerHeight", 6)
@@ -39,7 +44,6 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
       .attr("d", "M0,-5L10,0L0,5")
       .attr("fill", ARROW);
 
-    // layers
     const linkLayer  = root.append("g").attr("stroke", LINK).attr("stroke-opacity", 0.55);
     const nodeLayer  = root.append("g");
     const labelLayer = root.append("g");
@@ -52,11 +56,11 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
 
     const nodeRadius  = 5;
     const hoverRadius = 7;
-    const gapOffset   = 4; // reverted modest gap
+    const gapOffset   = 4; // modest gap (back to earlier)
 
-    const nodeFill = (d) => (data.degree.get(String(d.id)) === data.maxDeg ? ORANGE : BLACK);
+    const nodeFill = (d) => (degree.get(String(d.id)) === maxDeg ? ORANGE : BLACK);
 
-    let sim; // for drag reheat
+    let sim; // use inside drag handlers
 
     const node = nodeLayer.selectAll("circle")
       .data(nodes)
@@ -70,14 +74,14 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
       .on("mouseover", function (_, d) {
         d3.select(this).transition().duration(120).attr("r", hoverRadius).attr("fill", GREEN);
         const id = String(d.id);
-        link.attr("stroke-opacity", L =>
+        link.attr("stroke-opacity", (L) =>
           String(L.source.id ?? L.source) === id || String(L.target.id ?? L.target) === id ? 0.9 : 0.15
         );
-        node.attr("opacity", n => (n === d ? 1 : 0.35));
-        label.filter(ld => ld === d).attr("opacity", 1);
+        node.attr("opacity", (n) => (n === d ? 1 : 0.35));
+        label.filter((ld) => ld === d).attr("opacity", 1);
       })
       .on("mouseout", function () {
-        d3.select(this).transition().duration(120).attr("r", nodeRadius).attr("fill", d => nodeFill(d));
+        d3.select(this).transition().duration(120).attr("r", nodeRadius).attr("fill", (d) => nodeFill(d));
         link.attr("stroke-opacity", 0.55);
         node.attr("opacity", 1);
         label.attr("opacity", 0);
@@ -89,8 +93,9 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
           .on("end",   (event, d) => { d.fx = null; d.fy = null; if (sim) sim.alphaTarget(0); })
       );
 
-    // labels: text with white halo (reverted)
-    const labelText = d => d.title ? (d.title.length > 42 ? d.title.slice(0, 41) + "…" : d.title) : String(d.id);
+    // labels with white halo (hover only)
+    const labelText = (d) =>
+      d.title ? (d.title.length > 42 ? d.title.slice(0, 41) + "…" : d.title) : String(d.id);
     const label = labelLayer.selectAll("text")
       .data(nodes)
       .join("text")
@@ -104,21 +109,21 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
       .style("stroke-linejoin", "round")
       .attr("pointer-events", "none");
 
-    // --- pan & zoom (shared instance) – normal cursor; grabbing only while dragging
+    // pan/zoom (shared instance). Cursor normal; grabbing while panning only.
     const zoom = d3.zoom()
       .scaleExtent([0.3, 6])
-      .on("start", (e) => svg.style("cursor", "grabbing"))
-      .on("end",   (e) => svg.style("cursor", "default"))
+      .on("start", () => svg.style("cursor", "grabbing"))
+      .on("end",   () => svg.style("cursor", "default"))
       .on("zoom",  (e) => root.attr("transform", e.transform));
     zoomRef.current = zoom;
     svg.call(zoom).style("cursor", "default");
 
-    // angular-spread (gentle)
+    // gentle angular-spread
     function forceAngularSpread(minSep = 0.35, strength = 0.03) {
       let nodeById, adj;
       function init() {
-        nodeById = new Map(nodes.map(n => [String(n.id), n]));
-        adj = new Map(nodes.map(n => [n, []]));
+        nodeById = new Map(nodes.map((n) => [String(n.id), n]));
+        adj = new Map(nodes.map((n) => [n, []]));
         for (const l of links) {
           const s = nodeById.get(String(l.source.id ?? l.source));
           const t = nodeById.get(String(l.target.id ?? l.target));
@@ -165,11 +170,11 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
       .alpha(1)
       .alphaDecay(0.06);
 
-    // small trim at both ends; keep modest gap; arrow covers line tip visually
+    // shorten endpoints slightly; arrow tip sits right at line end
     function endpointWithGap(d, which) {
       const sx=d.source.x, sy=d.source.y, tx=d.target.x, ty=d.target.y;
       const dx=tx-sx, dy=ty-sy, dist=Math.hypot(dx,dy)||1, ux=dx/dist, uy=dy/dist;
-      const srcR=nodeRadius+gapOffset, tarR=nodeRadius+gapOffset+1.2;
+      const srcR=nodeRadius+gapOffset, tarR=nodeRadius+gapOffset; // no extra
       if (which==="x1") return sx + ux*srcR;
       if (which==="y1") return sy + uy*srcR;
       if (which==="x2") return tx - ux*tarR;
@@ -186,23 +191,27 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
       label.attr("x", d=>(d.x??0)+9).attr("y", d=>(d.y??0)+4);
     });
 
-    // initial fit — use the SAME zoom instance → no click needed
-    immediateFit(svg, zoom, nodes, width, height, 32);
+    // initial fit (immediate) so we start centered
+    immediateFit(svg, zoomRef.current, nodes, width, height, 32);
 
-    // handle future fits (Refresh/Focus)
-    const onFit = () => animateFit(svg, zoom, nodes, width, height, 32);
-    svg.on("smartfit", onFit);
+    // listen for signals from parent
+    svg.on("smartfit", () => animateFit(svg, zoomRef.current, nodes, width, height, 32)); // Focus
+    svg.on("recenter", () => recenterOnly(svg, zoomRef.current, nodes, width, height));  // Refresh
 
     return () => {
-      svg.on("smartfit", null);
+      svg.on("smartfit", null).on("recenter", null);
       sim.stop();
     };
   }, [data]);
 
-  // trigger fit on demand
+  // parent signals
   useEffect(() => {
     d3.select(svgRef.current).dispatch("smartfit");
   }, [fitSignal]);
+
+  useEffect(() => {
+    d3.select(svgRef.current).dispatch("recenter");
+  }, [recenterSignal]);
 
   return (
     <svg ref={svgRef} className={`w-full h-full rounded-lg bg-white ${className}`}>
@@ -211,28 +220,41 @@ export default function GraphPanel({ data, onSelect, className = "", fitSignal =
   );
 }
 
-/* ----- fitting helpers that use the SAME zoom instance ----- */
+/* ---------- fit helpers (use the SAME zoom instance) ---------- */
 
-function computeFit(nodes, width, height, pad=32) {
+function computeBounds(nodes) {
   const xs = nodes.map(n => n.x||0), ys = nodes.map(n => n.y||0);
   const minX=Math.min(...xs), maxX=Math.max(...xs);
   const minY=Math.min(...ys), maxY=Math.max(...ys);
-  const w=Math.max(1, maxX-minX), h=Math.max(1, maxY-minY);
-  const k = Math.min(1, 0.9 / Math.max(w/(width-pad*2), h/(height-pad*2)));
-  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
-  const tx = width/2 - k*cx, ty = height/2 - k*cy;
-  return d3.zoomIdentity.translate(tx, ty).scale(k);
+  return { minX, maxX, minY, maxY, w: Math.max(1, maxX-minX), h: Math.max(1, maxY-minY) };
 }
 
 function immediateFit(svg, zoom, nodes, width, height, pad=32) {
-  const t = computeFit(nodes, width, height, pad);
-  svg.call(zoom.transform, t); // IMPORTANT: same zoom instance
+  const { minX, maxX, minY, maxY, w, h } = computeBounds(nodes);
+  const k = Math.min(1, 0.9 / Math.max(w/(width-pad*2), h/(height-pad*2)));
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const t = d3.zoomIdentity.translate(width/2 - k*cx, height/2 - k*cy).scale(k);
+  svg.call(zoom.transform, t);
 }
 
 function animateFit(svg, zoom, nodes, width, height, pad=32) {
   const t0 = d3.zoomTransform(svg.node());
-  const t  = computeFit(nodes, width, height, pad);
+  const { minX, maxX, minY, maxY, w, h } = computeBounds(nodes);
+  const k = Math.min(1, 0.9 / Math.max(w/(width-pad*2), h/(height-pad*2)));
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const t = d3.zoomIdentity.translate(width/2 - k*cx, height/2 - k*cy).scale(k);
   const dist = Math.hypot(t0.x - t.x, t0.y - t.y) + Math.abs(t0.k - t.k)*50;
-  if (dist < 20) return; // already good enough
+  if (dist < 20) return;
   svg.transition().duration(500).call(zoom.transform, t);
+}
+
+/** Instant recenters to the current centroid, preserving the current scale. */
+function recenterOnly(svg, zoom, nodes, width, height) {
+  const t0 = d3.zoomTransform(svg.node());
+  const { minX, maxX, minY, maxY } = computeBounds(nodes);
+  const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
+  const tx = width/2 - t0.k*cx;
+  const ty = height/2 - t0.k*cy;
+  const t  = d3.zoomIdentity.translate(tx, ty).scale(t0.k);
+  svg.call(zoom.transform, t);   // no animation
 }

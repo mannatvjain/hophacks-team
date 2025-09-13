@@ -6,7 +6,8 @@ import DetailsPanel from "./DetailsPanel";
 
 export default function CitationNetworkView({ initialData, onBack }) {
   const [selectedNode, setSelectedNode] = useState(null);
-  const [fitSignal, setFitSignal] = useState(0); // trigger smart fit (refresh/focus)
+  const [fitSignal, setFitSignal] = useState(0);       // animated fit (Focus)
+  const [recenterSignal, setRecenterSignal] = useState(0); // instant recenter (Refresh)
 
   const data = useMemo(() => {
     const nodes = (initialData.nodes ?? []).map((d) => ({
@@ -19,11 +20,9 @@ export default function CitationNetworkView({ initialData, onBack }) {
       .map((l) => ({ source: String(l.source), target: String(l.target) }))
       .filter((l) => idMap.has(l.source) && idMap.has(l.target));
 
-    // compute inCitations from links
     for (const n of nodes) n.inCitations = [];
     for (const l of links) idMap.get(l.target)?.inCitations.push(l.source);
 
-    // degree for coloring (incident edges)
     const degree = new Map(nodes.map((n) => [n.id, 0]));
     for (const l of links) {
       degree.set(l.source, (degree.get(l.source) || 0) + 1);
@@ -52,15 +51,13 @@ export default function CitationNetworkView({ initialData, onBack }) {
             <span className="text-sm">Back</span>
           </button>
           <div className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <span className="leading-tight">
-              MVP Citation Explorer (dummy title)
-            </span>
+            <span className="leading-tight">MVP Citation Explorer (dummy title)</span>
             <CheckCircle2 className="w-4 h-4 text-green-500" title="Extracted ✓" />
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Focus (fit view without over-shrinking) */}
+          {/* Focus (animated fit all) */}
           <button
             className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
             onClick={() => setFitSignal((s) => s + 1)}
@@ -68,10 +65,10 @@ export default function CitationNetworkView({ initialData, onBack }) {
           >
             <Search className="w-4 h-4" />
           </button>
-          {/* Icon-only refresh; shows tooltip; no text; subtle hover darken */}
+          {/* Refresh (instant recenter, keep zoom) */}
           <button
             className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
-            onClick={() => setFitSignal((s) => s + 1)} // smart-fit instead of remounting
+            onClick={() => setRecenterSignal((s) => s + 1)}
             title="Refresh view"
           >
             <RotateCcw className="w-4 h-4" />
@@ -84,7 +81,8 @@ export default function CitationNetworkView({ initialData, onBack }) {
           <GraphPanel
             data={data}
             onSelect={setSelectedNode}
-            fitSignal={fitSignal}   // used for both Focus & Refresh
+            fitSignal={fitSignal}           // animated fit
+            recenterSignal={recenterSignal} // instant recenter
             className="h-full"
           />
         </div>
@@ -97,7 +95,6 @@ export default function CitationNetworkView({ initialData, onBack }) {
         />
       </div>
 
-      {/* Info strip (Rowan-ish indigo) */}
       <div className="mt-4 w-full rounded-md border border-indigo-500 bg-indigo-50 text-indigo-600 px-4 py-2 flex items-center gap-2">
         <Info className="w-4 h-4" />
         <span className="text-sm">information</span>
