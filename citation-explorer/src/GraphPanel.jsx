@@ -23,7 +23,7 @@ export default function GraphPanel({
   const LABEL  = "#334155";
 
   useEffect(() => {
-    const { nodes, links, degree, maxDeg } = data;
+    const { nodes, links, top10Ids } = data;
     const svg  = d3.select(svgRef.current);
     const root = svg.select(".root");
     root.selectAll("*").remove();
@@ -73,8 +73,9 @@ export default function GraphPanel({
     // immediate purple logic: use per-node flag for instant feedback
     const isPurpleNow = (d) => d.__purple === true || (readingIds?.has(String(d.id)) ?? false);
 
-    const degreeFill = (d) => (degree.get(String(d.id)) === maxDeg ? ORANGE : BLACK);
-    const nodeFill = (d) => (isPurpleNow(d) ? PURPLE : degreeFill(d));
+    const inTop10  = (d) => top10Ids.has(String(d.id));
+    const scoreFill = (d) => (inTop10(d) ? ORANGE : BLACK);
+    const nodeFill = (d) => (isPurpleNow(d) ? PURPLE : scoreFill(d));
 
     let sim;
 
@@ -241,14 +242,15 @@ export default function GraphPanel({
 
   // sync node colors to reading set (no jitter)
   useEffect(() => {
-    const svg = d3.select(svgRef.current);
-    svg.select(".root").selectAll("circle").each(function(d) {
-      d.__purple = readingIds?.has(String(d.id)); // keep local flag synced
-      const deg = (data.degree.get(String(d.id)) || 0);
-      const fill = d.__purple ? "#7c3aed" : (deg === data.maxDeg ? "#f97316" : "#0f172a");
-      d3.select(this).attr("fill", fill);
+  const svg = d3.select(svgRef.current);
+  svg.select(".root").selectAll("circle").each(function (d) {
+  d.__purple = readingIds?.has(String(d.id));
+  const fill = d.__purple
+    ? "#7c3aed"
+    : (data.top10Ids.has(String(d.id)) ? "#f97316" : "#0f172a");
+    d3.select(this).attr("fill", fill);
     });
-  }, [readingIds, data.degree, data.maxDeg]);
+  }, [readingIds, data.top10Ids]);
 
   useEffect(() => { d3.select(svgRef.current).dispatch("smartfit"); }, [fitSignal]);
   useEffect(() => { d3.select(svgRef.current).dispatch("recenter"); }, [recenterSignal]);

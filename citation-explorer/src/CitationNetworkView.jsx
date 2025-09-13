@@ -24,14 +24,22 @@ export default function CitationNetworkView({ initialData, onBack }) {
     for (const n of nodes) n.inCitations = [];
     for (const l of links) idMap.get(l.target)?.inCitations.push(l.source);
 
-    const degree = new Map(nodes.map((n) => [n.id, 0]));
-    for (const l of links) {
-      degree.set(l.source, (degree.get(l.source) || 0) + 1);
-      degree.set(l.target, (degree.get(l.target) || 0) + 1);
-    }
-    const maxDeg = Math.max(0, ...degree.values());
-    return { nodes, links, degree, maxDeg, idMap };
-  }, [initialData]);
+    // scores + TOP 10 ids by score (ties broken by id for stability)
+    const score = new Map(
+    nodes.map((n) => [n.id, Number.isFinite(n.score) ? Number(n.score) : 0])
+    );
+    const top10Ids = new Set(
+    [...nodes]
+     .sort(
+    (a, b) =>
+    (Number(b.score) || 0) - (Number(a.score) || 0) ||
+    String(a.id).localeCompare(String(b.id))
+    )
+    .slice(0, 10)
+    .map((n) => String(n.id))
+    );
+    return { nodes, links, score, top10Ids, idMap };
+    }, [initialData]);
 
   const jumpToId = (id) => {
     const n = data.idMap.get(String(id));
