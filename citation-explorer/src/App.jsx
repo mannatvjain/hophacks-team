@@ -1,11 +1,12 @@
 // src/App.jsx
 import { useEffect, useMemo, useState } from "react";
-import CitationNetworkView from "./CitationNetworkView"; // visualization only
+import CitationUploadPage from "./CitationUploadPage";
+import CitationNetworkView from "./CitationNetworkView";
 
 export default function App() {
+  const [view, setView] = useState("viz"); // "upload" | "viz"
   const [rawData, setRawData] = useState(null);
 
-  // Load your dummy dataset. Place it at: public/dummy-dataset.json
   useEffect(() => {
     fetch("/dummy-dataset.json")
       .then((r) => r.json())
@@ -13,14 +14,12 @@ export default function App() {
       .catch((e) => console.error("Failed to load dataset:", e));
   }, []);
 
-  // Normalize to { nodes, links }. If links are absent, derive from outCitations.
   const initialData = useMemo(() => {
     if (!rawData) return null;
 
     if (Array.isArray(rawData.links)) {
       return { nodes: rawData.nodes ?? [], links: rawData.links };
     }
-
     const nodes = (rawData.nodes ?? []).map((d) => ({ ...d }));
     const idSet = new Set(nodes.map((n) => String(n.id)));
     const links = [];
@@ -34,9 +33,16 @@ export default function App() {
     return { nodes, links };
   }, [rawData]);
 
+  if (view === "upload") return <CitationUploadPage />;
+
   if (!initialData) {
     return <div className="h-screen bg-gray-100 p-6 text-slate-600">Loading dataset…</div>;
   }
 
-  return <CitationNetworkView initialData={initialData} />;
+  return (
+    <CitationNetworkView
+      initialData={initialData}
+      onBack={() => setView("upload")}
+    />
+  );
 }
