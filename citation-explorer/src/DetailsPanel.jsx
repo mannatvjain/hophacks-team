@@ -2,13 +2,12 @@
 import React from "react";
 
 /**
- * Polished card design (as before), but stays single-page:
- * - We cap list lengths and truncate long strings to avoid scrolling.
+ * Polished card; no scroll (cap list length); titles wrap (no ellipsis).
+ * References & Cited-by are NUMBERED and CLICKABLE (jump to node in graph).
  */
-export default function DetailsPanel({ node, nodes, className = "" }) {
+export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }) {
   const container = "bg-white shadow-lg rounded-lg p-6 flex flex-col justify-start";
-  const maxItems = 8; // cap lists to avoid scroll
-  const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : s || "");
+  const maxItems = 10; // keep single page
 
   const getTitle = (id) => {
     const ref = nodes.find((n) => String(n.id) === String(id));
@@ -31,28 +30,21 @@ export default function DetailsPanel({ node, nodes, className = "" }) {
 
   return (
     <div className={`${container} ${className}`}>
-      {/* Title + ID */}
-      <h2 className="text-2xl font-semibold text-gray-900 truncate" title={node.title}>
-        {trunc(node.title || String(node.id), 64)}
+      {/* Title wraps to new line, no ellipsis */}
+      <h2 className="text-2xl font-semibold text-gray-900 leading-snug break-words">
+        {node.title || String(node.id)}
       </h2>
-      <p className="text-xs text-gray-500 truncate" title={String(node.id)}>
-        {trunc(String(node.id), 72)}
-      </p>
+      <p className="text-xs text-gray-500 break-all">{String(node.id)}</p>
 
-      {/* Authors / Year / Abstract (compact) */}
+      {/* Authors / Year */}
       <div className="text-sm text-gray-800 mt-3">
         <span className="font-medium">
-          {Array.isArray(node.authors)
-            ? trunc(node.authors.join(", "), 90)
-            : trunc(node.authors, 90)}
+          {Array.isArray(node.authors) ? node.authors.join(", ") : node.authors || "—"}
         </span>{" "}
         {node.year ? <span className="text-gray-600">({node.year})</span> : null}
       </div>
-      {node.abstract ? (
-        <p className="text-sm text-gray-800 mt-2">{trunc(node.abstract, 180)}</p>
-      ) : null}
 
-      {/* References */}
+      {/* References (numbered & clickable) */}
       <div className="mt-4 pt-4 border-t border-gray-200">
         <h3 className="text-gray-800 font-medium mb-2">
           References {refs.length > maxItems ? `(${refs.length})` : ""}
@@ -60,10 +52,16 @@ export default function DetailsPanel({ node, nodes, className = "" }) {
         {refs.length === 0 ? (
           <p className="text-sm text-gray-600">None</p>
         ) : (
-          <ul className="list-disc list-inside text-sm text-gray-800 space-y-1">
+          <ol className="list-decimal list-inside text-sm text-gray-800 space-y-1">
             {refs.slice(0, maxItems).map((cid) => (
-              <li key={cid} className="truncate" title={getTitle(cid)}>
-                {trunc(getTitle(cid), 70)}
+              <li key={cid}>
+                <button
+                  onClick={() => onJumpToId && onJumpToId(cid)}
+                  className="text-left hover:underline"
+                  title="Show in graph"
+                >
+                  {getTitle(cid)}
+                </button>
               </li>
             ))}
             {refs.length > maxItems ? (
@@ -71,11 +69,11 @@ export default function DetailsPanel({ node, nodes, className = "" }) {
                 …and {refs.length - maxItems} more
               </li>
             ) : null}
-          </ul>
+          </ol>
         )}
       </div>
 
-      {/* Cited by (now computed; should not show "None" unless truly none) */}
+      {/* Cited by (numbered & clickable) */}
       <div className="mt-4 pt-4 border-t border-gray-200">
         <h3 className="text-gray-800 font-medium mb-2">
           Cited by {cites.length > maxItems ? `(${cites.length})` : ""}
@@ -83,10 +81,16 @@ export default function DetailsPanel({ node, nodes, className = "" }) {
         {cites.length === 0 ? (
           <p className="text-sm text-gray-600">None</p>
         ) : (
-          <ul className="list-disc list-inside text-sm text-gray-800 space-y-1">
+          <ol className="list-decimal list-inside text-sm text-gray-800 space-y-1">
             {cites.slice(0, maxItems).map((cid) => (
-              <li key={cid} className="truncate" title={getTitle(cid)}>
-                {trunc(getTitle(cid), 70)}
+              <li key={cid}>
+                <button
+                  onClick={() => onJumpToId && onJumpToId(cid)}
+                  className="text-left hover:underline"
+                  title="Show in graph"
+                >
+                  {getTitle(cid)}
+                </button>
               </li>
             ))}
             {cites.length > maxItems ? (
@@ -94,7 +98,7 @@ export default function DetailsPanel({ node, nodes, className = "" }) {
                 …and {cites.length - maxItems} more
               </li>
             ) : null}
-          </ul>
+          </ol>
         )}
       </div>
     </div>
