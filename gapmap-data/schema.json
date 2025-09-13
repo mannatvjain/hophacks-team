@@ -1,0 +1,233 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Gap Map Data",
+  "description": "Schema for the Gap Map research gaps and foundational capabilities dataset",
+  "type": "object",
+  "required": [
+    "fields",
+    "gaps",
+    "capabilities",
+    "resources",
+    "metadata"
+  ],
+  "properties": {
+    "fields": {
+      "type": "array",
+      "description": "Research fields or disciplines",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the field"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the research field"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-friendly version of the field name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the research field"
+          }
+        }
+      }
+    },
+    "gaps": {
+      "type": "array",
+      "description": "Research and development gaps",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the R&D gap"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the R&D gap"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-friendly version of the gap name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the R&D gap"
+          },
+          "field": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "The research field this gap belongs to",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Unique identifier for the field"
+              },
+              "name": {
+                "type": "string",
+                "description": "Name of the research field"
+              }
+            }
+          },
+          "foundationalCapabilities": {
+            "type": "array",
+            "description": "IDs of foundational capabilities that address this gap",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "description": "Tags associated with this gap",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Foundational capabilities that address R&D gaps",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the capability"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the foundational capability"
+          },
+          "slug": {
+            "type": "string",
+            "description": "URL-friendly version of the capability name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the foundational capability"
+          },
+          "gaps": {
+            "type": "array",
+            "description": "IDs of R&D gaps addressed by this capability",
+            "items": {
+              "type": "string"
+            }
+          },
+          "resources": {
+            "type": "array",
+            "description": "IDs of resources related to this capability",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tags": {
+            "type": "array",
+            "description": "Tags associated with this capability",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "description": "Resources related to foundational capabilities",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "title"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the resource"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title of the resource"
+          },
+          "url": {
+            "type": "string",
+            "description": "URL where the resource can be accessed"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Summary or description of the resource"
+          },
+          "types": {
+            "type": "array",
+            "description": "Types of resource (e.g., Publication, Dataset, Tool)",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Metadata about the export",
+      "properties": {
+        "exportDate": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Date and time when the export was created"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version of the export format"
+        },
+        "counts": {
+          "type": "object",
+          "description": "Count of items in each category",
+          "properties": {
+            "fields": {
+              "type": "integer",
+              "description": "Number of fields"
+            },
+            "gaps": {
+              "type": "integer",
+              "description": "Number of R&D gaps"
+            },
+            "capabilities": {
+              "type": "integer",
+              "description": "Number of capabilities"
+            },
+            "resources": {
+              "type": "integer",
+              "description": "Number of resources"
+            }
+          }
+        }
+      }
+    }
+  }
+}
