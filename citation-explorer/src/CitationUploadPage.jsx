@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import ForceGraph from "./ForceGraph";
 import { Upload, Link as LinkIcon } from "lucide-react";
 
 export default function CitationUploadPage() {
@@ -91,32 +92,11 @@ export function CitationRightPane({ data = demoData }) {
       <div className="w-full h-screen grid grid-cols-[1fr_320px] gap-4 p-6 bg-white">
         {/* Graph container (placeholder for now) */}
         <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col">
-          <div className="text-sm text-slate-500 mb-3">
-            graph visualization (placeholder)
-          </div>
-          <div className="flex-1 rounded-2xl border border-dashed border-slate-300 p-4 overflow-auto">
-            <div className="text-xs text-slate-500 mb-2">Click to preview details:</div>
-            <ul className="space-y-2">
-              {data.nodes.map(n => (
-                <li key={n.id}>
-                  <button
-                    className={`w-full text-left px-3 py-2 rounded-xl border ${
-                      selected?.id === n.id
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white hover:bg-slate-50 border-slate-200"
-                    }`}
-                    onClick={() => setSelected(n)}
-                  >
-                    <div className="text-sm font-medium truncate">
-                      {n.title || n.id}
-                    </div>
-                    <div className="text-xs opacity-70 truncate">{String(n.id)}</div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="flex-1 rounded-2xl overflow-hidden">
+            <ForceGraph data={data} onSelect={setSelected} />
         </div>
+        </div>
+
   
         {/* Details sidebar */}
         <NodeDetails node={selected} inDegree={inDegree} />
