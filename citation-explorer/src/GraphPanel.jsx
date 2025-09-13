@@ -15,6 +15,7 @@ export default function GraphPanel({
   const zoomRef = useRef(null); // shared zoom instance
 
   const ORANGE = "#f97316";
+  const GOLD   = "#FFD700"; 
   const BLACK  = "#0f172a";
   const GREEN  = "#22c55e";
   const PURPLE = "#7c3aed";
@@ -23,7 +24,7 @@ export default function GraphPanel({
   const LABEL  = "#334155";
 
   useEffect(() => {
-    const { nodes, links, top10Ids } = data;
+    const { nodes, links, goldId, top10Ids } = data;
     const svg  = d3.select(svgRef.current);
     const root = svg.select(".root");
     root.selectAll("*").remove();
@@ -73,8 +74,12 @@ export default function GraphPanel({
     // immediate purple logic: use per-node flag for instant feedback
     const isPurpleNow = (d) => d.__purple === true || (readingIds?.has(String(d.id)) ?? false);
 
-    const inTop10  = (d) => top10Ids.has(String(d.id));
-    const scoreFill = (d) => (inTop10(d) ? ORANGE : BLACK);
+    const inTop10 = (d) => top10Ids.has(String(d.id));
+    const isGold  = (d) => goldId && String(d.id) === goldId;
+    const scoreFill = (d) =>
+      isGold(d) ? GOLD :
+      inTop10(d) ? ORANGE :
+      BLACK;
     const nodeFill = (d) => (isPurpleNow(d) ? PURPLE : scoreFill(d));
 
     let sim;
@@ -247,7 +252,9 @@ export default function GraphPanel({
   d.__purple = readingIds?.has(String(d.id));
   const fill = d.__purple
     ? "#7c3aed"
-    : (data.top10Ids.has(String(d.id)) ? "#f97316" : "#0f172a");
+    : (data.goldId && String(d.id) === data.goldId 
+        ? "#FFD700"
+        : (data.top10Ids.has(String(d.id)) ? "#f97316" : "#0f172a"));
     d3.select(this).attr("fill", fill);
     });
   }, [readingIds, data.top10Ids]);

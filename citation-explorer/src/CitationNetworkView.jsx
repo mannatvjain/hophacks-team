@@ -25,20 +25,19 @@ export default function CitationNetworkView({ initialData, onBack }) {
     for (const l of links) idMap.get(l.target)?.inCitations.push(l.source);
 
     // scores + TOP 10 ids by score (ties broken by id for stability)
+    
     const score = new Map(
-    nodes.map((n) => [n.id, Number.isFinite(n.score) ? Number(n.score) : 0])
-    );
-    const top10Ids = new Set(
-    [...nodes]
-     .sort(
-    (a, b) =>
-    (Number(b.score) || 0) - (Number(a.score) || 0) ||
-    String(a.id).localeCompare(String(b.id))
-    )
-    .slice(0, 10)
-    .map((n) => String(n.id))
-    );
-    return { nodes, links, score, top10Ids, idMap };
+         nodes.map((n) => [n.id, Number.isFinite(n.score) ? Number(n.score) : 0])
+        );
+        // Sort nodes by score desc (ties broken by id for stability)
+        const sorted = [...nodes].sort(
+          (a, b) =>
+            (Number(b.score) || 0) - (Number(a.score) || 0) ||
+            String(a.id).localeCompare(String(b.id))
+        );
+        const goldId = sorted.length ? String(sorted[0].id) : null;
+        const top10Ids = new Set(sorted.slice(1, 11).map((n) => String(n.id)));
+        return { nodes, links, score, goldId, top10Ids, idMap };
     }, [initialData]);
 
   const jumpToId = (id) => {
