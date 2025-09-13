@@ -37,7 +37,8 @@ export default function CitationNetworkView({ initialData, onBack }) {
         );
         const goldId = sorted.length ? String(sorted[0].id) : null;
         const top10Ids = new Set(sorted.slice(1, 11).map((n) => String(n.id)));
-        return { nodes, links, score, goldId, top10Ids, idMap };
+        const goldTitle = goldId ? (sorted[0].title || String(sorted[0].id)) : "Untitled";
+        return { nodes, links, score, goldId, goldTitle, top10Ids, idMap };
     }, [initialData]);
 
   const jumpToId = (id) => {
@@ -75,7 +76,7 @@ export default function CitationNetworkView({ initialData, onBack }) {
             <span className="text-sm">Back</span>
           </button>
           <div className="text-xl font-semibold tracking-tight flex items-center gap-2">
-            <span className="leading-tight">MVP Citation Explorer (dummy title)</span>
+            <span className="leading-tight">{data.goldTitle}</span>
             <CheckCircle2 className="w-4 h-4 text-green-500" title="Extracted ✓" />
           </div>
         </div>
