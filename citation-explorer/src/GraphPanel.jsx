@@ -5,23 +5,25 @@ import * as d3 from "d3";
 export default function GraphPanel({
   data,
   onSelect,
+  onToggleReading,
+  readingIds,
   className = "",
   fitSignal = 0,        // animated fit-all
   recenterSignal = 0,   // instant recenter (keep zoom)
 }) {
   const svgRef  = useRef(null);
-  const zoomRef = useRef(null); // keep the one zoom instance
+  const zoomRef = useRef(null); // shared zoom instance
 
   const ORANGE = "#f97316";
   const BLACK  = "#0f172a";
   const GREEN  = "#22c55e";
+  const PURPLE = "#7c3aed";
   const LINK   = "#9ca3af";
   const ARROW  = "#94a3b8";
   const LABEL  = "#334155";
 
   useEffect(() => {
     const { nodes, links, degree, maxDeg } = data;
-
     const svg  = d3.select(svgRef.current);
     const root = svg.select(".root");
     root.selectAll("*").remove();
@@ -30,12 +32,12 @@ export default function GraphPanel({
     const width  = Math.max(1, bb.width  || svgRef.current.clientWidth  || 800);
     const height = Math.max(1, bb.height || svgRef.current.clientHeight || 600);
 
-    // --- arrow marker (reverted triangle; tip aligned with line end)
+    // marker: triangle with tip meeting shortened line precisely
     const defs = svg.append("defs");
     defs.append("marker")
       .attr("id", "arrow")
       .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 10)  // tip sits at line end
+      .attr("refX", 10)
       .attr("refY", 0)
       .attr("markerWidth", 6)
       .attr("markerHeight", 6)
@@ -56,11 +58,16 @@ export default function GraphPanel({
 
     const nodeRadius  = 5;
     const hoverRadius = 7;
-    const gapOffset   = 4; // modest gap (back to earlier)
+    const gapOffset   = 4;
+    const tipAdjust   = 1.2; // just enough to eliminate the tiny mismatch you saw
 
-    const nodeFill = (d) => (degree.get(String(d.id)) === maxDeg ? ORANGE : BLACK);
+    // immediate purple logic: use per-node flag for instant feedback
+    const isPurpleNow = (d) => d.__purple === true || (readingIds?.has(String(d.id)) ?? false);
 
-    let sim; // use inside drag handlers
+    const degreeFill = (d) => (degree.get(String(d.id)) === maxDeg ? ORANGE : BLACK);
+    const nodeFill = (d) => (isPurpleNow(d) ? PURPLE : degreeFill(d));
+
+    let sim;
 
     const node = nodeLayer.selectAll("circle")
       .data(nodes)
@@ -70,7 +77,17 @@ export default function GraphPanel({
       .attr("stroke", "white")
       .attr("stroke-width", 1.6)
       .style("cursor", "pointer")
-      .on("click", (_, d) => onSelect && onSelect(d))
+      .on("click", (event, d) => {
+        if (event.metaKey || event.ctrlKey) {
+          // toggle local flag for immediate color
+          d.__purple = !isPurpleNow(d);
+          d3.select(event.currentTarget).attr("fill", nodeFill(d));
+          // update upstream set (no sim rebuild)
+          onToggleReading && onToggleReading(d.id);
+        } else {
+          onSelect && onSelect(d);
+        }
+      })
       .on("mouseover", function (_, d) {
         d3.select(this).transition().duration(120).attr("r", hoverRadius).attr("fill", GREEN);
         const id = String(d.id);
@@ -80,8 +97,12 @@ export default function GraphPanel({
         node.attr("opacity", (n) => (n === d ? 1 : 0.35));
         label.filter((ld) => ld === d).attr("opacity", 1);
       })
-      .on("mouseout", function () {
-        d3.select(this).transition().duration(120).attr("r", nodeRadius).attr("fill", (d) => nodeFill(d));
+      .on("mouseout", function (_, d) {
+        d3.select(this)
+          .transition()
+          .duration(120)
+          .attr("r", nodeRadius)
+          .attr("fill", nodeFill(d)); // returns to purple if selected, else degree color
         link.attr("stroke-opacity", 0.55);
         node.attr("opacity", 1);
         label.attr("opacity", 0);
@@ -109,7 +130,7 @@ export default function GraphPanel({
       .style("stroke-linejoin", "round")
       .attr("pointer-events", "none");
 
-    // pan/zoom (shared instance). Cursor normal; grabbing while panning only.
+    // pan/zoom (shared instance). Normal cursor; grabbing only while panning.
     const zoom = d3.zoom()
       .scaleExtent([0.3, 6])
       .on("start", () => svg.style("cursor", "grabbing"))
@@ -118,7 +139,7 @@ export default function GraphPanel({
     zoomRef.current = zoom;
     svg.call(zoom).style("cursor", "default");
 
-    // gentle angular-spread
+    // angular spread (gentle)
     function forceAngularSpread(minSep = 0.35, strength = 0.03) {
       let nodeById, adj;
       function init() {
@@ -170,11 +191,12 @@ export default function GraphPanel({
       .alpha(1)
       .alphaDecay(0.06);
 
-    // shorten endpoints slightly; arrow tip sits right at line end
+    // shorten endpoints: small symmetric trim + tiny tipAdjust so triangle meets perfectly
     function endpointWithGap(d, which) {
       const sx=d.source.x, sy=d.source.y, tx=d.target.x, ty=d.target.y;
       const dx=tx-sx, dy=ty-sy, dist=Math.hypot(dx,dy)||1, ux=dx/dist, uy=dy/dist;
-      const srcR=nodeRadius+gapOffset, tarR=nodeRadius+gapOffset; // no extra
+      const srcR=nodeRadius+gapOffset + tipAdjust*0.15;
+      const tarR=nodeRadius+gapOffset + tipAdjust;
       if (which==="x1") return sx + ux*srcR;
       if (which==="y1") return sy + uy*srcR;
       if (which==="x2") return tx - ux*tarR;
@@ -191,27 +213,33 @@ export default function GraphPanel({
       label.attr("x", d=>(d.x??0)+9).attr("y", d=>(d.y??0)+4);
     });
 
-    // initial fit (immediate) so we start centered
+    // initial center
     immediateFit(svg, zoomRef.current, nodes, width, height, 32);
 
-    // listen for signals from parent
-    svg.on("smartfit", () => animateFit(svg, zoomRef.current, nodes, width, height, 32)); // Focus
-    svg.on("recenter", () => recenterOnly(svg, zoomRef.current, nodes, width, height));  // Refresh
+    // external signals
+    svg.on("smartfit", () => animateFit(svg, zoomRef.current, nodes, width, height, 32));
+    svg.on("recenter", () => recenterOnly(svg, zoomRef.current, nodes, width, height));
 
     return () => {
       svg.on("smartfit", null).on("recenter", null);
       sim.stop();
     };
+  // don't put readingIds here (prevents sim rebuilds/jitter)
   }, [data]);
 
-  // parent signals
+  // sync node colors to reading set (no jitter)
   useEffect(() => {
-    d3.select(svgRef.current).dispatch("smartfit");
-  }, [fitSignal]);
+    const svg = d3.select(svgRef.current);
+    svg.select(".root").selectAll("circle").each(function(d) {
+      d.__purple = readingIds?.has(String(d.id)); // keep local flag synced
+      const deg = (data.degree.get(String(d.id)) || 0);
+      const fill = d.__purple ? "#7c3aed" : (deg === data.maxDeg ? "#f97316" : "#0f172a");
+      d3.select(this).attr("fill", fill);
+    });
+  }, [readingIds, data.degree, data.maxDeg]);
 
-  useEffect(() => {
-    d3.select(svgRef.current).dispatch("recenter");
-  }, [recenterSignal]);
+  useEffect(() => { d3.select(svgRef.current).dispatch("smartfit"); }, [fitSignal]);
+  useEffect(() => { d3.select(svgRef.current).dispatch("recenter"); }, [recenterSignal]);
 
   return (
     <svg ref={svgRef} className={`w-full h-full rounded-lg bg-white ${className}`}>
@@ -220,7 +248,7 @@ export default function GraphPanel({
   );
 }
 
-/* ---------- fit helpers (use the SAME zoom instance) ---------- */
+/* ---------- fit helpers ---------- */
 
 function computeBounds(nodes) {
   const xs = nodes.map(n => n.x||0), ys = nodes.map(n => n.y||0);
@@ -228,15 +256,12 @@ function computeBounds(nodes) {
   const minY=Math.min(...ys), maxY=Math.max(...ys);
   return { minX, maxX, minY, maxY, w: Math.max(1, maxX-minX), h: Math.max(1, maxY-minY) };
 }
-
 function immediateFit(svg, zoom, nodes, width, height, pad=32) {
   const { minX, maxX, minY, maxY, w, h } = computeBounds(nodes);
   const k = Math.min(1, 0.9 / Math.max(w/(width-pad*2), h/(height-pad*2)));
   const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
-  const t = d3.zoomIdentity.translate(width/2 - k*cx, height/2 - k*cy).scale(k);
-  svg.call(zoom.transform, t);
+  svg.call(zoom.transform, d3.zoomIdentity.translate(width/2 - k*cx, height/2 - k*cy).scale(k));
 }
-
 function animateFit(svg, zoom, nodes, width, height, pad=32) {
   const t0 = d3.zoomTransform(svg.node());
   const { minX, maxX, minY, maxY, w, h } = computeBounds(nodes);
@@ -247,14 +272,9 @@ function animateFit(svg, zoom, nodes, width, height, pad=32) {
   if (dist < 20) return;
   svg.transition().duration(500).call(zoom.transform, t);
 }
-
-/** Instant recenters to the current centroid, preserving the current scale. */
 function recenterOnly(svg, zoom, nodes, width, height) {
   const t0 = d3.zoomTransform(svg.node());
   const { minX, maxX, minY, maxY } = computeBounds(nodes);
   const cx=(minX+maxX)/2, cy=(minY+maxY)/2;
-  const tx = width/2 - t0.k*cx;
-  const ty = height/2 - t0.k*cy;
-  const t  = d3.zoomIdentity.translate(tx, ty).scale(t0.k);
-  svg.call(zoom.transform, t);   // no animation
+  svg.call(zoom.transform, d3.zoomIdentity.translate(width/2 - t0.k*cx, height/2 - t0.k*cy).scale(t0.k));
 }
