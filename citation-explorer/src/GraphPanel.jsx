@@ -32,33 +32,42 @@ export default function GraphPanel({
     const width  = Math.max(1, bb.width  || svgRef.current.clientWidth  || 800);
     const height = Math.max(1, bb.height || svgRef.current.clientHeight || 600);
 
+    //hi checkpoint
     // marker: triangle with tip meeting shortened line precisely
+    // arrow marker: wide wedge, scales with stroke width
     const defs = svg.append("defs");
     defs.append("marker")
       .attr("id", "arrow")
-      .attr("viewBox", "0 -5 10 10")
-      .attr("refX", 10)
-      .attr("refY", 0)
-      .attr("markerWidth", 6)
-      .attr("markerHeight", 6)
+      .attr("markerUnits", "strokeWidth")  // scale with line thickness
+      .attr("viewBox", "0 0 12 12")
+      .attr("refX", 9.75)                    // tip aligns at end
+      .attr("refY", 6)
+      .attr("markerWidth", 5)              // base ~4× stroke width
+      .attr("markerHeight", 5)
       .attr("orient", "auto")
       .append("path")
-      .attr("d", "M0,-5L10,0L0,5")
+      // wide arrowhead path
+      .attr("d", "M 0 0 L 12 6 L 0 12 L 3 6 Z")
       .attr("fill", ARROW);
 
+      
     const linkLayer  = root.append("g").attr("stroke", LINK).attr("stroke-opacity", 0.55);
     const nodeLayer  = root.append("g");
     const labelLayer = root.append("g");
 
+    const linkStroke = 1.25;
+
     const link = linkLayer.selectAll("line")
       .data(links)
       .join("line")
-      .attr("stroke-width", 1.25)
+      .attr("stroke-width", linkStroke)
+      .attr("stroke-linecap", "butt")  // no square extension
       .attr("marker-end", "url(#arrow)");
+    
 
     const nodeRadius  = 5;
     const hoverRadius = 7;
-    const gapOffset   = 4;
+    const gapOffset   = 3;
     const tipAdjust   = 1.2; // just enough to eliminate the tiny mismatch you saw
 
     // immediate purple logic: use per-node flag for instant feedback
@@ -193,22 +202,25 @@ export default function GraphPanel({
 
     // shorten endpoints: small symmetric trim + tiny tipAdjust so triangle meets perfectly
     function endpointWithGap(d, which) {
-      const sx=d.source.x, sy=d.source.y, tx=d.target.x, ty=d.target.y;
-      const dx=tx-sx, dy=ty-sy, dist=Math.hypot(dx,dy)||1, ux=dx/dist, uy=dy/dist;
-      const srcR=nodeRadius+gapOffset + tipAdjust*0.15;
-      const tarR=nodeRadius+gapOffset + tipAdjust;
-      if (which==="x1") return sx + ux*srcR;
-      if (which==="y1") return sy + uy*srcR;
-      if (which==="x2") return tx - ux*tarR;
-      if (which==="y2") return ty - uy*tarR;
+      const sx = d.source.x, sy = d.source.y, tx = d.target.x, ty = d.target.y;
+      const dx = tx - sx, dy = ty - sy, dist = Math.hypot(dx, dy) || 1;
+      const ux = dx / dist, uy = dy / dist;
+    
+      const srcR = nodeRadius + gapOffset;
+      const tarR = nodeRadius + gapOffset + linkStroke; // add stroke width fully
+    
+      if (which === "x1") return sx + ux * srcR;
+      if (which === "y1") return sy + uy * srcR;
+      if (which === "x2") return tx - ux * tarR;
+      if (which === "y2") return ty - uy * tarR;
     }
-
+    
     sim.on("tick", () => {
-      link
-        .attr("x1", d => endpointWithGap(d,"x1"))
-        .attr("y1", d => endpointWithGap(d,"y1"))
-        .attr("x2", d => endpointWithGap(d,"x2"))
-        .attr("y2", d => endpointWithGap(d,"y2"));
+        link
+        .attr("x1", d => endpointWithGap(d, "x1"))
+        .attr("y1", d => endpointWithGap(d, "y1"))
+        .attr("x2", d => endpointWithGap(d, "x2"))
+        .attr("y2", d => endpointWithGap(d, "y2"));      
       node.attr("cx", d=>d.x).attr("cy", d=>d.y);
       label.attr("x", d=>(d.x??0)+9).attr("y", d=>(d.y??0)+4);
     });

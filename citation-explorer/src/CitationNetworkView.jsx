@@ -91,7 +91,7 @@ export default function CitationNetworkView({ initialData, onBack }) {
         </div>
       </div>
 
-      <div className="h-[calc(100vh-11rem)] grid grid-cols-[1fr_360px] gap-6">
+      <div className="h-[calc(100vh-9.5rem)] grid grid-cols-[1fr_360px] gap-6">
         <div className="bg-white rounded-lg shadow-sm h-full">
           <GraphPanel
             data={data}
