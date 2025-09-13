@@ -76,33 +76,83 @@ export default function CitationUploadPage() {
 export function CitationRightPane({ data = demoData }) {
     const [selected, setSelected] = React.useState(null);
   
-    // compute simple in-degree (how many times each paper is cited in this dataset)
-    const inDegree = React.useMemo(() => {
-      const counts = new Map(data.nodes.map(n => [String(n.id), 0]));
-      for (const n of data.nodes) {
-        for (const t of n.outCitations || []) {
-          const k = String(t);
-          if (counts.has(k)) counts.set(k, counts.get(k) + 1);
-        }
-      }
-      return counts;
-    }, [data]);
+    // physics params (stateful, adjustable from sliders)
+    const [params, setParams] = React.useState({
+      linkDistance: 60,
+      linkStrength: 0.45,
+      charge: -320,
+      collide: 10,
+      velocityDecay: 0.25,
+      alphaDecay: 0.05,
+    });
   
     return (
       <div className="w-full h-screen grid grid-cols-[1fr_320px] gap-4 p-6 bg-white">
-        {/* Graph container (placeholder for now) */}
-        <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-4 flex flex-col">
-        <div className="flex-1 rounded-2xl overflow-hidden">
-            <ForceGraph data={data} onSelect={setSelected} />
+        {/* Graph + controls */}
+        <div className="flex flex-col gap-4">
+          <div className="flex-1 rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <ForceGraph data={data} onSelect={setSelected} {...params} />
+          </div>
+  
+          {/* Control pane */}
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900">Physics controls</h3>
+            {Object.entries(params).map(([key, val]) => (
+              <div key={key} className="flex flex-col text-xs">
+                <label className="flex justify-between mb-1">
+                  <span className="capitalize">{key}</span>
+                  <span>{val}</span>
+                </label>
+                <input
+                  type="range"
+                  min={key === "charge" ? -600 : 0}
+                  max={
+                    key === "charge"
+                      ? -100
+                      : key === "velocityDecay"
+                      ? 0.6
+                      : key === "alphaDecay"
+                      ? 0.2
+                      : 120
+                  }
+                  step={
+                    key === "velocityDecay" || key === "alphaDecay" ? 0.01 : 1
+                  }
+                  value={val}
+                  onChange={(e) =>
+                    setParams((p) => ({
+                      ...p,
+                      [key]:
+                        key === "charge"
+                          ? Number(e.target.value)
+                          : key === "velocityDecay" || key === "alphaDecay"
+                          ? parseFloat(e.target.value)
+                          : Number(e.target.value),
+                    }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
         </div>
-        </div>
-
   
         {/* Details sidebar */}
-        <NodeDetails node={selected} inDegree={inDegree} />
+        <NodeDetails node={selected} inDegree={computeInDegree(data)} />
       </div>
     );
   }
+  
+function computeInDegree(data) {
+    const counts = new Map(data.nodes.map((n) => [String(n.id), 0]));
+    for (const n of data.nodes) {
+      for (const t of n.outCitations || []) {
+        const k = String(t);
+        if (counts.has(k)) counts.set(k, counts.get(k) + 1);
+      }
+    }
+    return counts;
+  }
+  
   
   function NodeDetails({ node, inDegree }) {
     if (!node) {

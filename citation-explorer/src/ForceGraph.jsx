@@ -2,11 +2,17 @@ import React, { useEffect, useMemo, useRef } from "react";
 import * as d3 from "d3";
 
 export default function ForceGraph({
-  data,
-  onSelect = () => {},
-  width = 900,
-  height = 600,
-}) {
+    data,
+    onSelect = () => {},
+    width = 900,
+    height = 600,
+    linkDistance = 60,
+    linkStrength = 0.45,
+    charge = -320,
+    collide = 10,
+    velocityDecay = 0.25,
+    alphaDecay = 0.05,
+  }) {
   const svgRef = useRef(null);
   const gRef = useRef(null);
 
@@ -55,15 +61,15 @@ export default function ForceGraph({
 
     // --- Physics: brisk + playful
     const sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink(links).id(d => String(d.id)).distance(60).strength(0.45))
-      .force("charge", d3.forceManyBody().strength(-320))             // more push
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(10).iterations(2)) // lighter bumping
-      .force("x", d3.forceX(width / 2).strength(0.02))                // mild shape control
-      .force("y", d3.forceY(height / 2).strength(0.02))
-      .velocityDecay(0.25)   // lower damping = bouncier
-      .alpha(1)
-      .alphaDecay(0.05);     // slower cooling = more lively settling
+    .force("link", d3.forceLink(links).id(d => String(d.id)).distance(linkDistance).strength(linkStrength))
+    .force("charge", d3.forceManyBody().strength(charge))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collision", d3.forceCollide().radius(collide).iterations(2))
+    .force("x", d3.forceX(width / 2).strength(0.02))
+    .force("y", d3.forceY(height / 2).strength(0.02))
+    .velocityDecay(velocityDecay)
+    .alpha(1)
+    .alphaDecay(alphaDecay);   
 
     // Layers
     const link = g.append("g")
@@ -142,7 +148,10 @@ export default function ForceGraph({
     }
 
     return () => { clearTimeout(fitTimer); sim.stop(); };
-  }, [nodes, links, neighbors, width, height, onSelect]);
+}, [
+    nodes, links, neighbors, width, height, onSelect,
+    linkDistance, linkStrength, charge, collide, velocityDecay, alphaDecay
+  ]);  
 
   return (
     <svg ref={svgRef} className="w-full h-full rounded-2xl bg-white shadow" width={width} height={height}>
