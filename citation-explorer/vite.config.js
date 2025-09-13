@@ -7,9 +7,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',  // mock server
+        target: 'http://localhost:8000', 
         changeOrigin: true,
       }
     }
-  }
+  }  
 })

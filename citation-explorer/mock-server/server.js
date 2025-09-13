@@ -35,7 +35,7 @@ function withLinks(data) {
 
 app.post("/api/graph", (req, res) => {
   const { doi } = req.body || {};
-  console.log("Mock received DOI:", doi);
+  console.log("gopgop:", doi);
   res.json(withLinks(demo));
 });
 
