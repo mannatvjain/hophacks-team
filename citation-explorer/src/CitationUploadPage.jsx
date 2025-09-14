@@ -16,7 +16,7 @@ export default function CitationUploadPage({ onSubmitDOI }) {
     <div className="w-full h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-white p-6">
       <div className="max-w-xl w-full bg-white shadow-xl rounded-3xl p-10 flex flex-col items-center gap-8">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Watership Down 🐇
+          ABCorpus
         </h1>
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-6">
           <div className="flex items-center gap-3 border-b border-slate-300 focus-within:border-slate-500">
