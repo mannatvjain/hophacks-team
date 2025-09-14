@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import ast
+import re
 
 # ---------- API contract ----------
 class GraphRequest(BaseModel):
@@ -81,6 +82,13 @@ def _get_str(row, *keys) -> str | None:
     return None
 
 # Build nodes
+def _strip_jats_p(s: str | None) -> str | None:
+    if not isinstance(s, str):
+        return s
+    # remove <jats:p>, </jats:p>, and <jats:p/>
+    return re.sub(r"</?jats:p\s*/?>", "", s, flags=re.IGNORECASE)
+
+
 _ALL_NODES: List[Dict[str, Any]] = []
 for _, row in _df.iterrows():
     doi = _norm_doi(row.get("DOI"))
@@ -101,7 +109,7 @@ for _, row in _df.iterrows():
     score = float(score_val) if pd.notna(score_val) else None
 
     title = _get_str(row, "Title", "title")
-    abstract = _get_str(row, "Abstract", "abstract")
+    abstract = _strip_jats_p(_get_str(row, "Abstract", "abstract"))
 
     _ALL_NODES.append({
         "id": doi,

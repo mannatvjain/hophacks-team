@@ -13,7 +13,7 @@ import { ChevronDown } from "lucide-react";
  */
 
 export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }) {
-  const container = "bg-white shadow-lg rounded-lg p-6 flex flex-col justify-start";
+  const container = "bg-white shadow-lg rounded-lg p-6 flex flex-col justify-start h-full overflow-y-auto min-h-0";
   const maxItems = 10; // cap list lengths to avoid scrolling
   const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : s || "");
 
