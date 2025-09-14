@@ -143,7 +143,7 @@ def _gold_id_fallback() -> str:
     scored = [n for n in _ALL_NODES if isinstance(n.get("score"), (int, float))]
     return (max(scored, key=lambda n: n["score"]) if scored else _ALL_NODES[0])["id"]
 
-def _bfs_ids(start_id: str | None, depth: int = 2, max_nodes: int = 600) -> set[str]:
+def _bfs_ids(start_id: str | None, depth: int = 2, max_nodes: int = 800) -> set[str]:
     start = _norm_doi(start_id)
     if not start or start not in _ID_SET:
         start = _gold_id_fallback()
@@ -170,17 +170,56 @@ _DESCRIPTION: List[Tuple[str, str]] = [
     # ("10.1016/j.cell.2020.12.015", "description for background study B"),
 ]
 
+# ---------- descriptions dataset ----------
+DESC_CSV_PATH = "data/descriptions.csv"
+
+try:
+    print(f"[desc] loading CSV: {DESC_CSV_PATH}")
+    _DESC_DF = pd.read_csv(DESC_CSV_PATH)
+    print(f"[desc] loaded shape={_DESC_DF.shape}, cols={list(_DESC_DF.columns)}")
+
+    doi_col = next((c for c in _DESC_DF.columns if "doi" in str(c).lower()), _DESC_DF.columns[0])
+    txt_col = next(
+        (c for c in _DESC_DF.columns if any(k in str(c).lower() for k in ["description", "summary"])),
+        _DESC_DF.columns[1] if len(_DESC_DF.columns) > 1 else _DESC_DF.columns[0],
+    )
+    print(f"[desc] using columns: doi_col={doi_col}, txt_col={txt_col}")
+
+    _DESCRIPTION_ALL: List[Tuple[str, str]] = []
+    for _, row in _DESC_DF.dropna(subset=[doi_col]).iterrows():
+        doi_raw = str(row[doi_col])
+        doi_norm = _norm_doi(doi_raw)
+        # keep summary text even if pandas thinks it’s NaN
+        txt = str(row[txt_col]) if pd.notna(row[txt_col]) else ""
+        if doi_norm:
+            _DESCRIPTION_ALL.append((doi_norm, txt))
+        else:
+            print(f"[desc] skipped row (bad DOI): {doi_raw}")
+    print(f"[desc] total descriptions loaded: {len(_DESCRIPTION_ALL)}")
+    print(doi_raw)
+except Exception as e:
+    print(f"[desc] ERROR loading descriptions: {e}")
+    _DESCRIPTION_ALL = []
+
+
 # ---------- logic ----------
 def build_graph_for_doi(doi: str, depth: int | None = None) -> Dict[str, Any]:
+    print(f"[graph] build_graph_for_doi called with doi={doi}, depth={depth}")
     d = depth if isinstance(depth, int) and depth >= 0 else 2
-    keep = _bfs_ids(doi, depth=d, max_nodes=600)
+    keep = _bfs_ids(doi, depth=d, max_nodes=800)
+    print(f"[graph] keep set size={len(keep)}")
+
     nodes = [n for n in _ALL_NODES if n["id"] in keep]
     links = [e for e in _ALL_LINKS if e["source"] in keep and e["target"] in keep]
+    desc_pairs = [pair for pair in _DESCRIPTION_ALL if pair[0] in keep]
+
+    print(f"[graph] nodes={len(nodes)}, links={len(links)}, desc_pairs={len(desc_pairs)}")
+
     return {
         "nodes": nodes,
         "links": links,
         "shortest_distance": [],
-        "description": _DESCRIPTION,
+        "description": desc_pairs,
     }
 
 # ---------- endpoint ----------

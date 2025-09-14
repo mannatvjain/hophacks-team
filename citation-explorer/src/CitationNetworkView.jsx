@@ -1,6 +1,6 @@
 // CitationNetworkView.jsx
 import React, { useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, RotateCcw, Search, Info, Mail } from "lucide-react";
+import { ArrowLeft, CheckCircle2, RotateCcw, Telescope, Search, Info, Mail } from "lucide-react";
 import GraphPanel from "./GraphPanel";
 import DetailsPanel from "./DetailsPanel";
 
@@ -41,8 +41,31 @@ export default function CitationNetworkView({ initialData, onBack, doi }) {
       id: String(d.id),
       inCitations: Array.isArray(d.inCitations) ? [...d.inCitations] : [],
     }));
+    
+    
     const idMap = new Map(nodes.map((n) => [n.id, n]));
 
+    // DEBUG: log what we got from backend
+    console.log("[frontend] graphData.description", graphData.description);
+    console.log("[frontend] node count before attaching desc", nodes.length);
+    
+    const descPairs = Array.isArray(graphData.description) ? graphData.description : [];
+    const descMap = new Map(descPairs.map(([id, text]) => [String(id), String(text)]));
+    
+    for (const n of nodes) {
+      const d = descMap.get(n.id);
+      if (d) {
+        n.description = d;
+        console.log(`[frontend] attached description to ${n.id}`);
+      }
+    }
+    
+    // DEBUG: how many nodes ended up with descriptions
+    console.log(
+      "[frontend] nodes with descriptions",
+      nodes.filter((n) => n.description).length
+    );
+    
     const links = (graphData.links ?? [])
       .map((l) => ({ source: String(l.source), target: String(l.target) }))
       .filter((l) => idMap.has(l.source) && idMap.has(l.target));
@@ -178,7 +201,7 @@ export default function CitationNetworkView({ initialData, onBack, doi }) {
             onClick={() => setFitSignal((s) => s + 1)}
             title="Focus (fit view)"
           >
-            <Search className="w-4 h-4" />
+            <Telescope className="w-4 h-4" />
           </button>
           <button
             className="inline-flex items-center justify-center w-9 h-9 rounded-md border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100"
