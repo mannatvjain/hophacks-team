@@ -206,12 +206,20 @@ except Exception as e:
 def build_graph_for_doi(doi: str, depth: int | None = None) -> Dict[str, Any]:
     print(f"[graph] build_graph_for_doi called with doi={doi}, depth={depth}")
     d = depth if isinstance(depth, int) and depth >= 0 else 2
-    keep = _bfs_ids(doi, depth=d, max_nodes=800)
+    keep = _bfs_ids(doi, depth=d, max_nodes=1000)
     print(f"[graph] keep set size={len(keep)}")
 
     nodes = [n for n in _ALL_NODES if n["id"] in keep]
     links = [e for e in _ALL_LINKS if e["source"] in keep and e["target"] in keep]
     desc_pairs = [pair for pair in _DESCRIPTION_ALL if pair[0] in keep]
+
+    start_id = _norm_doi("10.1016/j.tins.2010.01.006")
+    if not start_id or start_id not in _ID_SET:
+        start_id = _gold_id_fallback()          # same fallback logic as BFS
+    if start_id in keep:
+        desc_pairs = [p for p in desc_pairs if p[0] != start_id]  # avoid dup
+        desc_pairs.append((start_id, "[DEBUG] backend dummy description ✅"))
+        print(f"[graph][debug] injected dummy description for {start_id}")
 
     print(f"[graph] nodes={len(nodes)}, links={len(links)}, desc_pairs={len(desc_pairs)}")
 

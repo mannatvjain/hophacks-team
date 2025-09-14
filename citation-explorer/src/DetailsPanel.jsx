@@ -2,18 +2,33 @@
 import React, { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
+// Hardcoded fallback descriptions (by exact DOI)
+const MANUAL_DESCRIPTIONS = {
+  "10.1016/0304-3940(86)90466-0": `This intellectual lineage begins with the discovery of long-term potentiation (LTP) as a fundamental cellular mechanism of memory...`,
+  "10.1016/0306-4522(88)90127-3": `The research path here centers on the two-stage model of hippocampal memory...`,
+  "10.1016/0006-8993(84)91356-8": `This set of papers establishes a direct lineage from the initial discovery and behavioral characterization of hippocampal sharp wave activity during periods of rest...`,
+  "10.1038/330649a0": `The research trajectory here starts with the foundational cognitive map theory...`,
+  "10.1016/0304-3940(88)90477-6": `This sequence of studies reveals how early research on the physiological properties of hippocampal sharp waves during immobility led to their proposed role in a two-stage model of memory consolidation...`,
+  "10.1113/jphysiol.1983.sp014507": `The papers form a clear intellectual arc from the early physiological description of hippocampal sharp waves to their integration into a two-stage model of memory...`,
+  "10.1016/0006-8993(85)90257-4": `The path begins with the foundational physiological characterization of sharp waves...`,
+  "10.1016/0006-8993(88)90763-9": `This research chain progresses from the discovery of the hippocampus's role in working memory...`,
+  "10.1038/290413a0": `The papers form a cohesive intellectual chain...`,
+  "10.1016/0006-8993(87)90793-1": `The path of discovery begins with the foundational observation of neural replay during hippocampal sharp waves...`,
+};
+
 /**
  * Polished card; single-page (no scroll).
  * Adds "Abstract" section with a Notion-style callout and a collapse/expand toggle.
  * - Title wraps (no ellipsis)
  * - DOI/id shown under title
  * - Authors + year
+ * - Optional Description (from backend or manual fallback)
  * - Abstract (preview by default; toggle to reveal rest)
  * - References / Cited by: numbered & clickable via onJumpToId
  */
-
 export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }) {
-  const container = "bg-white shadow-lg rounded-lg p-6 flex flex-col justify-start h-full overflow-y-auto min-h-0";
+  const container =
+    "bg-white shadow-lg rounded-lg p-6 flex flex-col justify-start h-full overflow-y-auto min-h-0";
   const maxItems = 10; // cap list lengths to avoid scrolling
   const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : s || "");
 
@@ -33,8 +48,8 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
     );
   }
 
-  const refs  = Array.isArray(node.outCitations) ? node.outCitations : [];
-  const cites = Array.isArray(node.inCitations)  ? node.inCitations  : [];
+  const refs = Array.isArray(node.outCitations) ? node.outCitations : [];
+  const cites = Array.isArray(node.inCitations) ? node.inCitations : [];
 
   // --- Abstract preview / collapse logic ---
   const RAW_ABS = node?.abstract || "";
@@ -55,6 +70,9 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
 
   const [expanded, setExpanded] = useState(false);
 
+  // Fallback description for this DOI (if backend didn't attach one)
+  const desc = node.description ?? MANUAL_DESCRIPTIONS[String(node.id)];
+
   return (
     <div className={`${container} ${className}`}>
       {/* Title + ID */}
@@ -73,17 +91,15 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
         {node.year ? <span className="text-gray-600">({node.year})</span> : null}
       </div>
 
-      {/* Description (only when provided) */}
-      {node.description ? (
+      {/* Description (only when provided, from backend or manual map) */}
+      {desc ? (
         <div className="mt-4 pt-4 border-t border-gray-200">
           <h3 className="text-gray-800 font-medium mb-2">Description</h3>
           <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-stone-600 whitespace-pre-wrap break-words">
-            {node.description}
+            {desc}
           </div>
         </div>
       ) : null}
-
-
 
       {/* Abstract (callout with disclosure; expands a bit, then scrolls inside) */}
       <div className="mt-3">
@@ -105,41 +121,36 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
         <div className="relative rounded-md border border-gray-200 bg-gray-50">
           {/* Scoped slim scrollbar */}
           <style>{`
-            .abstract-scroll::-webkit-scrollbar {
-              width: 6px; /* total gutter space */
-            }
-
-            .abstract-scroll::-webkit-scrollbar-track {
-              background: transparent;
-            }
-
-            .abstract-scroll::-webkit-scrollbar-thumb:hover {
-              background: transparent;
-            }
-
-            .abstract-scroll{
-              padding-right: 6px;
-            }
+            .abstract-scroll::-webkit-scrollbar { width: 6px; }
+            .abstract-scroll::-webkit-scrollbar-track { background: transparent; }
+            .abstract-scroll::-webkit-scrollbar-thumb:hover { background: transparent; }
+            .abstract-scroll { padding-right: 6px; }
           `}</style>
 
-        <div
-          className={`abstract-scroll p-3 text-sm text-gray-800 whitespace-pre-wrap break-words ${
-            expanded ? "overflow-y-auto" : "overflow-hidden"
-          }`}
-          style={{
-            maxHeight: expanded ? "18rem" : "7rem",
-            transition: "max-height 200ms ease",
-          }}
-        >
-          {!isLong ? (
-            RAW_ABS || "—"
-          ) : (
-            expanded ? <>{preview}{rest}</> : <>{preview}…</>
-          )}
-        </div>
+          <div
+            className={`abstract-scroll p-3 text-sm text-gray-800 whitespace-pre-wrap break-words ${
+              expanded ? "overflow-y-auto" : "overflow-hidden"
+            }`}
+            style={{
+              maxHeight: expanded ? "18rem" : "7rem",
+              transition: "max-height 200ms ease",
+            }}
+          >
+            {!isLong ? (
+              RAW_ABS || "—"
+            ) : expanded ? (
+              <>
+                {preview}
+                {rest}
+              </>
+            ) : (
+              <>
+                {preview}…
+              </>
+            )}
+          </div>
         </div>
       </div>
-
 
       {/* References */}
       <div className="mt-4 pt-4 border-t border-gray-200">
@@ -162,9 +173,7 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
               </li>
             ))}
             {refs.length > maxItems ? (
-              <li className="text-xs text-gray-500">
-                …and {refs.length - maxItems} more
-              </li>
+              <li className="text-xs text-gray-500">…and {refs.length - maxItems} more</li>
             ) : null}
           </ol>
         )}
@@ -191,9 +200,7 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
               </li>
             ))}
             {cites.length > maxItems ? (
-              <li className="text-xs text-gray-500">
-                …and {cites.length - maxItems} more
-              </li>
+              <li className="text-xs text-gray-500">…and {cites.length - maxItems} more</li>
             ) : null}
           </ol>
         )}
