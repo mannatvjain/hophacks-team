@@ -1,0 +1,49 @@
+## Inspiration
+Undergraduates and even professionals are often lost when entering fields of research that are new to them. To speed up the assimilation of novel ideas, our project looks at citations of research papers to point out resources that are often cited and could be used as good background information. Our Python-based model is based on graphs, which were pruned after the addition of new layers. The graphs were then subjected to a graph neural network that learned to represent each node such that they can be compared based on their position and connections in the graph. We built a user interface to explore the citation network and found the top sources of interest. For the top citations, we included summaries of what links the specific path to the input article in the graph to explore the evolution of ideas. Next, we will look into expanding the citation network by optimizing the pruning conditions and the number of layers of citation depth.
+
+##What It Does
+ABCorpus is an application designed to help students and researchers alike find foundational sources related to a research paper for a deeper understanding of the concept. The application accepts a research paper’s URL from the user and builds a graph by tracing through the paper’s references and the ones that follow thereafter. The user is then able to explore the interactive graph, read information on the sources, and email specified sources to themselves for later access.
+
+##How We Built It
+Frontend:
+* React,
+* JavaScript
+* Python
+* CSS
+* Interactive Physics-Based Graph
+
+Backend:
+* Python
+* Torch
+* Parallelized process for faster running (Cuda)
+* Graph Sage (machine learning library for graph embedding)
+
+##Challenges We Ran Into
+Data Extraction: Since our application takes in a URL for the research paper, we needed to scrape the relevant data from the internet. However, due to HTML formats differing from website to website, and certain websites omitting data, we were not always able to obtain all the necessary data points. We did find a variety of ways to deal with and work around this issue.
+
+Reference Cut Off: Our application branches off of the original research paper by looking at that paper’s references, looking at each reference paper’s citations, and so on. This process could essentially go on forever, leading to extremely bloated data sets and slow runtimes.
+
+JavaScript Connecting to Python: This was our first time connecting a frontend and backend in different programming languages.
+
+##Accomplishments
+* Designed an intuitive, professional user interface.
+* Implementing a graphical network that prunes insignificant nodes as it is built.
+* Designing a graph-based system for visualizing source connections.
+* Creating an application that can help our peers and mentors alike.
+* Clean integration of functionality and user interface.
+
+##What We Learned
+Throughout this project, we learned the different phases of product development, and how to effectively utilize APIs and artificial intelligence while programming. We started this project with a glimpse of an idea and not all the skills necessary to execute it, but we made up for it in determination, passion, and resourcefulness.
+
+This project gave us a deeper understanding of what it means to build a project from scratch. We had to learn how to outline a decision and determine the incremental steps to execute it. As we programmed, we became very familiar with new libraries and APIs.
+
+During this project we learned how to work effectively on teams with each member working simultaneously, but aware of what everyone else was doing. We ensured that everyone was engaged by tracking our tasks and progress on a shared Notion page and collectively working through any issues that we encountered.
+
+##What’s Next for ABCorpus
+Looking ahead, we plan to expand and refine ABCorpus to make it even more impactful. One area of focus is eliminating bias in the data, as we observed that certain layers of the graph tend to dominate by pointing disproportionately to the same node. By balancing this structure, we can provide a more accurate view of source significance. We also aim to integrate a large language model capable of summarizing how different sources are connected, offering users clearer context at a glance. In addition, we will strengthen our URL verification system to ensure smoother, more reliable input from users. Finally, we plan to conduct human trials with a diverse group of individuals to evaluate real-world usefulness, gather feedback, and identify areas for improvement. Through these steps, we hope to transform ABCorpus into a trusted, accessible companion for navigating complex research.
+
+
+Contact:
+Mannat Jain
+Oliwia Lidwin
+Andra Skye Morrison

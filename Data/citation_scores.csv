@@ -1,0 +1,5 @@
+DOI,Layer,Indegree,Direct,Freq,Seed,Score
+DOI_0,0,3,0,4,1,0.477
+DOI_1,1,3,1,3,0,0.4795
+DOI_2,1,2,1,2,0,0.4778
+DOI_3,1,1,1,1,0,0.4783
