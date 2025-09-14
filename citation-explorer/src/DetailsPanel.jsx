@@ -73,6 +73,18 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
         {node.year ? <span className="text-gray-600">({node.year})</span> : null}
       </div>
 
+      {/* Description (only when provided) */}
+      {node.description ? (
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <h3 className="text-gray-800 font-medium mb-2">Description</h3>
+          <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-stone-600 whitespace-pre-wrap break-words">
+            {node.description}
+          </div>
+        </div>
+      ) : null}
+
+
+
       {/* Abstract (callout with disclosure; expands a bit, then scrolls inside) */}
       <div className="mt-3">
         <div className="flex items-center justify-between mb-1">
@@ -127,6 +139,7 @@ export default function DetailsPanel({ node, nodes, onJumpToId, className = "" }
         </div>
         </div>
       </div>
+
 
       {/* References */}
       <div className="mt-4 pt-4 border-t border-gray-200">

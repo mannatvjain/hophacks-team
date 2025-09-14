@@ -1,5 +1,5 @@
 # backend/main.py
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple 
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +24,8 @@ class Link(BaseModel):
 class GraphResponse(BaseModel):
     nodes: List[Node]
     links: List[Link]
-    shortest_distance: List[str]  # <-- NEW
+    shortest_distance: List[str]  
+    description: List[Tuple[str, str]] 
 
 # ---------- app ----------
 app = FastAPI()
@@ -107,18 +108,18 @@ def build_graph_for_doi(doi: str) -> Dict[str, Any]:
     # derive links from outCitations (same as mock)
     ids = {n["id"] for n in demo["nodes"]}
     links = [{"source": n["id"], "target": t} for n in demo["nodes"] for t in n.get("outCitations", []) if t in ids]
+    shortest_distance = ["10.1038/nature14236", "10.1016/j.tins.2010.01.006", "10.1016/0306-4522(89)90423-5", "10.1016/0304-3940(86)90466-0"]
+    description = [
+        ["10.1016/j.tins.2010.01.006", "description for path node 1"],
+        ["10.1016/j.cell.2020.12.015", "description for background study B"],
+    ]
+
     return {
     "nodes": demo["nodes"],
     "links": links,
-    # two-id dummy path (origin -> endpoint); replace later with your CSV array
-    "shortest_distance": [
-    "10.1038/nature14236",
-    "10.1016/j.tins.2010.01.006",
-    "10.1016/0306-4522(89)90423-5",
-    "10.1016/0304-3940(86)90466-0",
-],
+    "shortest_distance": shortest_distance,
+    "description": description,
 }
-
 
 # ---------- endpoint ----------
 @app.post("/api/graph", response_model=GraphResponse)

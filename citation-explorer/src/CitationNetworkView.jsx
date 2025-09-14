@@ -17,6 +17,15 @@ export default function CitationNetworkView({ initialData, onBack }) {
       id: String(d.id),
       inCitations: Array.isArray(d.inCitations) ? [...d.inCitations] : [],
     }));
+    const descPairs = Array.isArray(initialData.description) ? initialData.description : [];
+    const descMap = new Map(descPairs.map(([id, text]) => [String(id), text]));
+
+    // Attach description only to matching DOIs
+    for (const n of nodes) {
+      const d = descMap.get(n.id);
+      if (d) n.description = d;
+    }
+
     const idMap = new Map(nodes.map((n) => [n.id, n]));
     const links = (initialData.links ?? [])
       .map((l) => ({ source: String(l.source), target: String(l.target) }))
