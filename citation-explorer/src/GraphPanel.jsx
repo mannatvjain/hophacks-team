@@ -19,13 +19,16 @@ function starPath(cx, cy, spikes = 5, outerR = STAR_OUTER, innerR = STAR_INNER) 
 
 /* ----------------------------- component ----------------------------- */
 export default function GraphPanel({
-  data,                // { nodes, links, goldId, top10Ids, ... }
+  data,
   onSelect,
   onToggleReading,
   readingIds,
   className = "",
-  fitSignal = 0,       // animated fit-all
-  recenterSignal = 0,  // instant recenter (keep zoom)
+  fitSignal = 0,
+  recenterSignal = 0,
+  mode = "full",
+  depth = 2,                    // NEW
+  onDepthChange = () => {},     // NEW
 }) {
   const svgRef  = useRef(null);
   const zoomRef = useRef(null); // keep ONE zoom instance
@@ -370,10 +373,46 @@ export default function GraphPanel({
   useEffect(() => { d3.select(svgRef.current).dispatch("recenter"); }, [recenterSignal]);
 
   return (
-    <svg ref={svgRef} className={`w-full h-full rounded-lg bg-white ${className}`}>
-      <g className="root" />
-    </svg>
-  );
+    <div className={`relative w-full h-full ${className}`}>
+      <svg ref={svgRef} className="w-full h-full rounded-lg bg-white">
+        <g className="root" />
+      </svg>
+  
+      {/* Depth control — flatter Notion-ish */}
+<div className="absolute left-3 bottom-3">
+  <div className="flex items-center gap-2 rounded-lg border border-gray-100 bg-white/90 px-2.5 py-1">
+    <span className="text-xs text-slate-600">Depth</span>
+
+    <div className="flex items-center rounded-md ring-1 ring-gray-100 overflow-hidden divide-x divide-gray-100 bg-white">
+      <button
+        type="button"
+        aria-label="Decrease depth"
+        title="Decrease depth"
+        onClick={() => onDepthChange(Math.max(0, depth - 1))}
+        className="w-7 h-7 grid place-items-center text-slate-700 hover:bg-gray-50 active:bg-gray-100 focus:outline-none"
+      >
+        –
+      </button>
+
+      <span className="px-2 text-xs font-medium text-slate-800 tabular-nums select-none">
+        {depth}
+      </span>
+
+      <button
+        type="button"
+        aria-label="Increase depth"
+        title="Increase depth"
+        onClick={() => onDepthChange(Math.min(8, depth + 1))}
+        className="w-7 h-7 grid place-items-center text-slate-700 hover:bg-gray-50 active:bg-gray-100 focus:outline-none"
+      >
+        +
+      </button>
+    </div>
+  </div>
+</div>
+
+    </div>
+  );   
 }
 
 /* ============================ fit helpers ============================ */

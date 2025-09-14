@@ -4,100 +4,119 @@ import { ArrowLeft, CheckCircle2, RotateCcw, Search, Info, Mail } from "lucide-r
 import GraphPanel from "./GraphPanel";
 import DetailsPanel from "./DetailsPanel";
 
-export default function CitationNetworkView({ initialData, onBack }) {
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
+export default function CitationNetworkView({ initialData, onBack, doi }) {
+  // selection + camera
   const [selectedNode, setSelectedNode] = useState(null);
   const [fitSignal, setFitSignal] = useState(0);         // animated fit (Focus)
   const [recenterSignal, setRecenterSignal] = useState(0); // instant recenter (Refresh)
-  const [readingIds, setReadingIds] = useState(new Set()); // persistent purple list
-  const [showPath, setShowPath] = useState(true); // NEW: toggle shortest-path rendering
+
+  // reading list
+  const [readingIds, setReadingIds] = useState(new Set());
+
+  // BFS depth (controls backend subgraph size)
+  const [depth, setDepth] = useState(3);
+
+  // live graph data (starts from server-provided initialData)
+  const [graphData, setGraphData] = useState(initialData || { nodes: [], links: [], shortest_distance: [] });
+
+  // ---- fetcher for depth changes ----
+  async function fetchGraph(nextDepth) {
+    const body = { doi: String(doi || ""), depth: Number(nextDepth) };
+    const res = await fetch(`${API_URL}/api/graph`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+    setGraphData(json);
+    setSelectedNode(null);
+    setFitSignal((s) => s + 1); // smooth refit after redraw
+  }
 
   const data = useMemo(() => {
-    const nodes = (initialData.nodes ?? []).map((d) => ({
+    const nodes = (graphData.nodes ?? []).map((d) => ({
       ...d,
       id: String(d.id),
       inCitations: Array.isArray(d.inCitations) ? [...d.inCitations] : [],
     }));
-    const descPairs = Array.isArray(initialData.description) ? initialData.description : [];
-    const descMap = new Map(descPairs.map(([id, text]) => [String(id), text]));
-
-    // Attach description only to matching DOIs
-    for (const n of nodes) {
-      const d = descMap.get(n.id);
-      if (d) n.description = d;
-    }
-
     const idMap = new Map(nodes.map((n) => [n.id, n]));
-    const links = (initialData.links ?? [])
+
+    const links = (graphData.links ?? [])
       .map((l) => ({ source: String(l.source), target: String(l.target) }))
       .filter((l) => idMap.has(l.source) && idMap.has(l.target));
 
+    // build in-citations
     for (const n of nodes) n.inCitations = [];
     for (const l of links) idMap.get(l.target)?.inCitations.push(l.source);
 
-    // scores + TOP 10 ids by score (ties broken by id for stability)
-    
-    const score = new Map(
-         nodes.map((n) => [n.id, Number.isFinite(n.score) ? Number(n.score) : 0])
-        );
-        // Sort nodes by score desc (ties broken by id for stability)
-        const sorted = [...nodes].sort(
-          (a, b) =>
-            (Number(b.score) || 0) - (Number(a.score) || 0) ||
-            String(a.id).localeCompare(String(b.id))
-        );
-        const goldId = sorted.length ? String(sorted[0].id) : null;
-        const top10Ids = new Set(sorted.slice(1, 11).map((n) => String(n.id)));
-        // ---- shortest paths (gold ↔ top-10) on UNDIRECTED topology ----
-// Directed link keys (for highlighting actual arrows)
-const linkKeys = new Set(links.map(l => `${l.source}->${l.target}`));
+    // scores + TOP 10 ids by score (ties by id for stability)
+    const score = new Map(nodes.map((n) => [n.id, Number.isFinite(n.score) ? Number(n.score) : 0]));
+    const sorted = [...nodes].sort(
+      (a, b) => (Number(b.score) || 0) - (Number(a.score) || 0) || String(a.id).localeCompare(String(b.id))
+    );
+    const goldId = sorted.length ? String(sorted[0].id) : null;
+    const top10Ids = new Set(sorted.slice(1, 11).map((n) => String(n.id)));
+    const goldTitle = goldId ? (sorted[0].title || String(sorted[0].id)) : "Untitled";
 
-// Undirected adjacency for BFS
-const adj = new Map(nodes.map(n => [n.id, new Set()]));
-for (const l of links) {
-  adj.get(l.source)?.add(l.target);
-  adj.get(l.target)?.add(l.source);
-}
-
-// BFS from goldId (fewest hops)
-const parents = new Map();
-const visited = new Set();
-const q = [];
-if (goldId) {
-  parents.set(goldId, null);
-  visited.add(goldId);
-  q.push(goldId);
-}
-while (q.length) {
-  const u = q.shift();
-  for (const v of adj.get(u) ?? []) {
-    if (!visited.has(v)) {
-      visited.add(v);
-      parents.set(v, u);
-      q.push(v);
+    // ---- shortest paths (gold → each orange), gather *directed* edges to highlight ----
+    const linkKeys = new Set(links.map((l) => `${l.source}->${l.target}`)); // for direction
+    const adj = new Map(nodes.map((n) => [n.id, new Set()]));               // undirected for BFS
+    for (const l of links) {
+      adj.get(l.source)?.add(l.target);
+      adj.get(l.target)?.add(l.source);
     }
-  }
-}
 
-// Reconstruct edges along gold→each orange path, keeping real arrow direction
-const pathEdgeKeys = new Set();
-for (const tid of top10Ids) {
-  if (tid === goldId) continue;
-  if (!parents.has(tid)) continue; // unreachable
-  let v = tid;
-  while (parents.get(v) != null) {
-    const u = parents.get(v);
-    const k1 = `${u}->${v}`, k2 = `${v}->${u}`;
-    if (linkKeys.has(k1)) pathEdgeKeys.add(k1);
-    else if (linkKeys.has(k2)) pathEdgeKeys.add(k2);
-    v = u;
-  }
-}
-        const goldTitle = goldId ? (sorted[0].title || String(sorted[0].id)) : "Untitled";
-        return {
-          nodes, links, score, goldId, goldTitle, top10Ids, idMap,
-          shortest_distance: (initialData.shortest_distance ?? []).map(String), pathEdgeKeys: [...pathEdgeKeys],
-        };        
-    }, [initialData]);
+    // BFS from gold
+    const parents = new Map();
+    const visited = new Set();
+    const q = [];
+    if (goldId) {
+      parents.set(goldId, null);
+      visited.add(goldId);
+      q.push(goldId);
+    }
+    while (q.length) {
+      const u = q.shift();
+      for (const v of adj.get(u) ?? []) {
+        if (!visited.has(v)) {
+          visited.add(v);
+          parents.set(v, u);
+          q.push(v);
+        }
+      }
+    }
+
+    // Reconstruct edge keys for all gold→orange paths, preserving real arrow direction
+    const pathEdgeKeys = new Set();
+    for (const tid of top10Ids) {
+      if (tid === goldId) continue;
+      if (!parents.has(tid)) continue;
+      let v = tid;
+      while (parents.get(v) != null) {
+        const u = parents.get(v);
+        const k1 = `${u}->${v}`, k2 = `${v}->${u}`;
+        if (linkKeys.has(k1)) pathEdgeKeys.add(k1);
+        else if (linkKeys.has(k2)) pathEdgeKeys.add(k2);
+        v = u;
+      }
+    }
+
+    return {
+      nodes,
+      links,
+      score,
+      goldId,
+      goldTitle,
+      top10Ids,
+      idMap,
+      // passthrough from backend (unused if pathEdgeKeys present)
+      shortest_distance: (graphData.shortest_distance ?? []).map(String),
+      // NEW: edges to highlight in orange
+      pathEdgeKeys: [...pathEdgeKeys],
+    };
+  }, [graphData]);
 
   const jumpToId = (id) => {
     const n = data.idMap.get(String(id));
@@ -113,34 +132,27 @@ for (const tid of top10Ids) {
     });
   };
 
-  const readingTitles = [...readingIds].map(
-    (id) => data.idMap.get(id)?.title || id
-  );
-  
+  const readingTitles = [...readingIds].map((id) => data.idMap.get(id)?.title || id);
+
   const handleExport = () => {
     const subject = encodeURIComponent("Recommended Reading");
-  
-    // grab the original paper’s title (gold node)
     const originalPaper = data.goldTitle || "the original paper";
-  
-    // build the body
     let lines = [];
     lines.push(`Recommended reading based on ${originalPaper}`);
-    lines.push(""); // blank line for spacing
-    lines = lines.concat(
-      readingTitles.map((t, i) => `${i + 1}. ${t}`)
-    );
-  
-    // CRLF line breaks for consistent formatting across clients
+    lines.push("");
+    lines = lines.concat(readingTitles.map((t, i) => `${i + 1}. ${t}`));
     const bodyPlain = lines.join("\r\n");
     const body = encodeURIComponent(bodyPlain);
-  
-    // default recipient = yourself (replace with your address)
     const to = "your.email@example.com";
-  
     window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
-  };  
-  
+  };
+
+  // handle depth control clicks from GraphPanel
+  const handleDepthChange = (nextDepth) => {
+    setDepth(nextDepth);
+    fetchGraph(nextDepth);
+  };
+
   return (
     <div className="h-screen bg-gray-100 text-gray-900 font-sans p-6">
       {/* Header */}
@@ -178,7 +190,6 @@ for (const tid of top10Ids) {
         </div>
       </div>
 
-
       <div className="h-[calc(100vh-9.5rem)] grid grid-cols-[1fr_360px] gap-6">
         <div className="bg-white rounded-lg shadow-sm h-full">
           <GraphPanel
@@ -188,6 +199,9 @@ for (const tid of top10Ids) {
             readingIds={readingIds}
             fitSignal={fitSignal}
             recenterSignal={recenterSignal}
+            mode="full"
+            depth={depth}
+            onDepthChange={handleDepthChange}
             className="h-full"
           />
         </div>
@@ -200,7 +214,7 @@ for (const tid of top10Ids) {
         />
       </div>
 
-      {/* Reading strip — back to the original info-bar palette, thin height, scrollbar hidden */}
+      {/* Reading strip */}
       <ReadingStrip titles={readingTitles} onExport={handleExport} />
     </div>
   );
@@ -242,5 +256,3 @@ function ReadingStrip({ titles, onExport }) {
     </>
   );
 }
-
-

@@ -10,6 +10,7 @@ import re
 # ---------- API contract ----------
 class GraphRequest(BaseModel):
     doi: str
+    depth: int | None = None   # NEW
 
 class Node(BaseModel):
     id: str
@@ -169,19 +170,20 @@ _DESCRIPTION: List[Tuple[str, str]] = [
 ]
 
 # ---------- logic ----------
-def build_graph_for_doi(doi: str) -> Dict[str, Any]:
-    keep = _bfs_ids(doi, depth=2, max_nodes=600)  # tweak depth/max_nodes as needed
+def build_graph_for_doi(doi: str, depth: int | None = None) -> Dict[str, Any]:
+    d = depth if isinstance(depth, int) and depth >= 0 else 2
+    keep = _bfs_ids(doi, depth=d, max_nodes=600)
     nodes = [n for n in _ALL_NODES if n["id"] in keep]
     links = [e for e in _ALL_LINKS if e["source"] in keep and e["target"] in keep]
     return {
         "nodes": nodes,
         "links": links,
-        "shortest_distance": [],   # you’ll fill this later
+        "shortest_distance": [],
         "description": _DESCRIPTION,
     }
 
 # ---------- endpoint ----------
 @app.post("/api/graph", response_model=GraphResponse)
 async def api_graph(req: GraphRequest) -> GraphResponse:
-    data = build_graph_for_doi(req.doi)
-    return data  # FastAPI will validate/serialize to the contract
+    data = build_graph_for_doi(req.doi, req.depth)  # NEW
+    return data
