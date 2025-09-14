@@ -16,6 +16,7 @@ from tqdm import tqdm
 import requests
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import random
 
 # ------------------------
 # Crossref API helpers
@@ -29,11 +30,17 @@ def fetch_doi_data(doi):
     url = f"https://api.crossref.org/works/{doi}"
     headers = {'User-Agent': 'CitationGraph/1.0 (mailto:your-email@example.com)'}
     try:
-        r = requests.get(url, headers=headers, timeout=10)
+        # Add jitter to avoid synchronized requests
+        time.sleep(random.uniform(0.1, 0.3))
+        r = requests.get(url, headers=headers, timeout=15)
         if r.status_code == 200:
             data = r.json()['message']
             doi_cache[doi] = data
             return data
+        elif r.status_code == 404:
+            print(f"DOI {doi} not found")
+        else:
+            print(f"Error fetching {doi}: HTTP {r.status_code}")
     except Exception as e:
         print(f"Exception fetching {doi}: {str(e)}")
     doi_cache[doi] = None
@@ -54,28 +61,44 @@ def get_citation_count(doi):
 # ------------------------
 # Parallel fetching helpers
 # ------------------------
-def fetch_references_parallel(dois, max_workers=8):
+def fetch_references_parallel(dois, max_workers=4):
     refs_map = {}
+    
     def worker(doi):
-        time.sleep(0.05)
+        time.sleep(random.uniform(0.1, 0.5))  # Add more delay between requests
         return doi, get_references(doi)
+    
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(worker, doi) for doi in dois]
-        for future in as_completed(futures):
-            doi, refs = future.result()
-            refs_map[doi] = refs
+        futures = {executor.submit(worker, doi): doi for doi in dois}
+        for future in tqdm(as_completed(futures), total=len(dois), desc="Fetching references"):
+            doi = futures[future]
+            try:
+                doi, refs = future.result()
+                refs_map[doi] = refs
+            except Exception as e:
+                print(f"Error processing {doi}: {str(e)}")
+                refs_map[doi] = []
+    
     return refs_map
 
-def fetch_citation_counts_parallel(dois, max_workers=8):
+def fetch_citation_counts_parallel(dois, max_workers=4):
     counts_map = {}
+    
     def worker(doi):
-        time.sleep(0.02)
+        time.sleep(random.uniform(0.05, 0.2))  # Add more delay between requests
         return doi, get_citation_count(doi)
+    
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(worker, doi) for doi in dois]
-        for future in as_completed(futures):
-            doi, count = future.result()
-            counts_map[doi] = count
+        futures = {executor.submit(worker, doi): doi for doi in dois}
+        for future in tqdm(as_completed(futures), total=len(dois), desc="Fetching citation counts"):
+            doi = futures[future]
+            try:
+                doi, count = future.result()
+                counts_map[doi] = count
+            except Exception as e:
+                print(f"Error processing {doi}: {str(e)}")
+                counts_map[doi] = 1
+    
     return counts_map
 
 # ------------------------
@@ -87,15 +110,19 @@ def add_layer_parallel(G, current_layer, max_refs_per_node=20):
     if not layer_nodes:
         return G, new_nodes
 
-    references_dict = fetch_references_parallel(layer_nodes, max_workers=8)
+    # Add progress bar for reference fetching
+    references_dict = fetch_references_parallel(layer_nodes, max_workers=4)
 
     all_new_dois = set()
     for refs in references_dict.values():
         all_new_dois.update(refs)
     all_new_dois = [doi for doi in all_new_dois if doi not in G]
-    citation_counts = fetch_citation_counts_parallel(all_new_dois, max_workers=8)
+    
+    # Add progress bar for citation count fetching
+    citation_counts = fetch_citation_counts_parallel(all_new_dois, max_workers=4)
 
-    for node in layer_nodes:
+    # Add progress bar for node processing
+    for node in tqdm(layer_nodes, desc=f"Processing nodes in layer {current_layer}"):
         references = references_dict.get(node, [])[:max_refs_per_node]
         for ref in references:
             if ref not in G:
@@ -113,10 +140,10 @@ def add_layer_parallel(G, current_layer, max_refs_per_node=20):
                 G.nodes[ref]['freq'] += 1
             G.add_edge(node, ref)
 
-    # Pruning
+    # Pruning with progress bar
     current_layer_nodes = [n for n in G.nodes if G.nodes[n]['layer'] == current_layer]
     to_remove = []
-    for n in current_layer_nodes:
+    for n in tqdm(current_layer_nodes, desc=f"Pruning layer {current_layer}"):
         if G.nodes[n]['layer'] == 0 or G.nodes[n]['direct'] == 1:
             continue
         if current_layer >= 2:
@@ -130,7 +157,8 @@ def add_layer_parallel(G, current_layer, max_refs_per_node=20):
             if n in new_nodes:
                 new_nodes.remove(n)
 
-    for n in G.nodes:
+    # Update indegree with progress bar
+    for n in tqdm(G.nodes, desc="Updating indegree"):
         G.nodes[n]['indegree'] = G.in_degree(n)
 
     return G, new_nodes
@@ -147,7 +175,7 @@ def build_initial_graph(source):
 def pyg_data_from_nx(G):
     doi_list = list(G.nodes)
     node_features = []
-    for node in doi_list:
+    for node in tqdm(doi_list, desc="Converting to PyG data"):
         data = G.nodes[node]
         node_features.append([
             data['layer'], data['indegree'], data['direct'], 
@@ -192,16 +220,19 @@ def build_citation_graph(source_doi, max_layers=3, top_k=3, epochs_per_layer=50)
     model = GraphSAGE(in_channels=in_features, hidden_channels=16, out_channels=8)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
+    # Main loop with progress bar
+    pbar = tqdm(total=max_layers, desc="Building citation graph layers")
     while current_layer <= max_layers and not converged:
         G, new_nodes = add_layer_parallel(G, current_layer)
         if not new_nodes:
+            pbar.update(max_layers - current_layer + 1)
             break
 
         data, doi_list = pyg_data_from_nx(G)
 
-        # Train GNN
+        # Train GNN with progress bar
         model.train()
-        for epoch in range(epochs_per_layer):
+        for epoch in tqdm(range(epochs_per_layer), desc=f"Training GNN for layer {current_layer}"):
             optimizer.zero_grad()
             embeddings = model(data.x, data.edge_index)
             if data.edge_index.size(1) > 0:
@@ -223,11 +254,31 @@ def build_citation_graph(source_doi, max_layers=3, top_k=3, epochs_per_layer=50)
         if previous_top and current_top == previous_top:
             print(f"Top-{top_k} converged at layer {current_layer}")
             converged = True
+            pbar.update(max_layers - current_layer + 1)
             break
         previous_top = current_top
+        
+        pbar.update(1)
         current_layer += 1
-
+    
+    pbar.close()
     return G
+
+# ------------------------
+# Save edges to CSV
+# ------------------------
+def save_edges_to_csv(G, filename):
+    with open(filename, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Citing_DOI", "Cited_DOI", "Citing_Layer", "Cited_Layer", "Citation_Type"])
+        
+        for u, v in tqdm(G.edges(), desc="Saving edges to CSV"):
+            citing_layer = G.nodes[u]['layer']
+            cited_layer = G.nodes[v]['layer']
+            citation_type = "Direct" if G.nodes[v]['direct'] == 1 else "Indirect"
+            writer.writerow([u, v, citing_layer, cited_layer, citation_type])
+    
+    print(f"Edges saved to {filename}")
 
 # ------------------------
 # Run with real DOIs
@@ -242,11 +293,11 @@ for source_doi in test_dois:
     if G is None:
         continue
 
-    # Save node scores CSV
+    # Save node scores CSV with progress bar
     with open(f"citation_scores_{source_doi.replace('/', '_')}.csv", "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["DOI","Layer","Indegree","Direct","Freq","Seed","Citation_Count","Score"])
-        for node, data_node in G.nodes(data=True):
+        for node, data_node in tqdm(G.nodes(data=True), desc="Saving node scores"):
             writer.writerow([
                 node, data_node['layer'], data_node['indegree'], data_node['direct'],
                 data_node['freq'], data_node['seed'], data_node.get('citation_count',0),
@@ -254,14 +305,18 @@ for source_doi in test_dois:
             ])
     print(f"Node scores saved.")
 
-    # Layer weights CSV
+    # Save edges CSV
+    save_edges_to_csv(G, f"citation_edges_{source_doi.replace('/', '_')}.csv")
+
+    # Layer weights CSV with progress bar
     layer_data = defaultdict(list)
-    for node, data_node in G.nodes(data=True):
+    for node, data_node in tqdm(G.nodes(data=True), desc="Calculating layer weights"):
         layer_data[data_node['layer']].append(data_node.get('score',0))
+    
     with open(f"layer_weights_{source_doi.replace('/', '_')}.csv","w",newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["Layer","Num_Nodes","Sum_Score","Avg_Score"])
-        for layer, scores in layer_data.items():
+        for layer, scores in tqdm(layer_data.items(), desc="Saving layer weights"):
             writer.writerow([layer, len(scores), round(sum(scores),4), round(sum(scores)/len(scores),4)])
     print(f"Layer weights saved.")
 
