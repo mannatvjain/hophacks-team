@@ -55,12 +55,23 @@ export default function CitationNetworkView({ initialData, onBack }) {
     });
   };
 
-  const readingTitles = [...readingIds].map((id) => data.idMap.get(id)?.title || id);
+  const readingTitles = [...readingIds].map(
+    (id) => data.idMap.get(id)?.title || id
+  );
+  
   const handleExport = () => {
     const subject = encodeURIComponent("Reading list");
-    const body = encodeURIComponent(readingTitles.map((t, i) => `${i + 1}. ${t}`).join("\n"));
+  
+    // join with real newlines so each entry goes on its own line
+    const bodyPlain = readingTitles
+      .map((t, i) => `${i + 1}. ${t}`)
+      .join("\n");
+  
+    // encode newlines as %0A for the mailto link
+    const body = encodeURIComponent(bodyPlain);
+  
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
+  };  
 
   return (
     <div className="h-screen bg-gray-100 text-gray-900 font-sans p-6">
