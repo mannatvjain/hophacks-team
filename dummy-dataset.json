@@ -1,0 +1,74 @@
+{
+  nodes: [
+    {
+      id: "10.fake/seed001",
+      title: "Seed Paper on Genomic Diagnostics",
+      year: 2021,
+      authors: ["Smith J", "Lee K"],
+      outCitations: ["10.fake/bg001", "10.fake/bg002"]
+    },
+    {
+      id: "10.fake/bg001",
+      title: "Background Study on Sequencing",
+      year: 2019,
+      authors: ["Patel R"],
+      outCitations: ["10.fake/ref001"]
+    },
+    {
+      id: "10.fake/bg002",
+      title: "Review of Cancer Genomics",
+      year: 2020,
+      authors: ["Nguyen L", "Choi M"],
+      outCitations: []
+    },
+    {
+      id: "10.fake/ref001",
+      title: "Early Methods in Gene Analysis",
+      year: 2015,
+      authors: ["Chen Y"],
+      outCitations: []
+    },
+    {
+      id: "10.fake/app001",
+      title: "Application of AI in Genomic Diagnostics",
+      year: 2022,
+      authors: ["Gomez A"],
+      outCitations: ["10.fake/seed001", "10.fake/bg002"]
+    },
+    {
+      id: "10.fake/app002",
+      title: "Clinical Validation of Biomarker Detection",
+      year: 2023,
+      authors: ["Rao S"],
+      outCitations: ["10.fake/app001"]
+    },
+    {
+      id: "10.fake/method001",
+      title: "Novel Sequencing Method",
+      year: 2018,
+      authors: ["Davis H", "Iqbal T"],
+      outCitations: ["10.fake/ref001"]
+    },
+    {
+      id: "10.fake/tool001",
+      title: "Software Toolkit for Genomics",
+      year: 2020,
+      authors: ["Wang P"],
+      outCitations: ["10.fake/method001"]
+    },
+    {
+      id: "10.fake/app003",
+      title: "Cross-species Comparative Study",
+      year: 2021,
+      authors: ["Ali B", "Khan N"],
+      outCitations: ["10.fake/bg001", "10.fake/tool001"]
+    },
+    {
+      id: "10.fake/future001",
+      title: "Future Directions in Genomic Diagnostics",
+      year: 2024,
+      authors: ["Lopez J", "Singh R"],
+      outCitations: ["10.fake/app001", "10.fake/app002", "10.fake/app003"]
+    }
+  ]
+}

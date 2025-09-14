@@ -60,19 +60,29 @@ export default function CitationNetworkView({ initialData, onBack }) {
   );
   
   const handleExport = () => {
-    const subject = encodeURIComponent("Reading list");
+    const subject = encodeURIComponent("Recommended Reading");
   
-    // join with real newlines so each entry goes on its own line
-    const bodyPlain = readingTitles
-      .map((t, i) => `${i + 1}. ${t}`)
-      .join("\n");
+    // grab the original paper’s title (gold node)
+    const originalPaper = data.goldTitle || "the original paper";
   
-    // encode newlines as %0A for the mailto link
+    // build the body
+    let lines = [];
+    lines.push(`Recommended reading based on ${originalPaper}`);
+    lines.push(""); // blank line for spacing
+    lines = lines.concat(
+      readingTitles.map((t, i) => `${i + 1}. ${t}`)
+    );
+  
+    // CRLF line breaks for consistent formatting across clients
+    const bodyPlain = lines.join("\r\n");
     const body = encodeURIComponent(bodyPlain);
   
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    // default recipient = yourself (replace with your address)
+    const to = "your.email@example.com";
+  
+    window.location.href = `mailto:${to}?subject=${subject}&body=${body}`;
   };  
-
+  
   return (
     <div className="h-screen bg-gray-100 text-gray-900 font-sans p-6">
       {/* Header */}
