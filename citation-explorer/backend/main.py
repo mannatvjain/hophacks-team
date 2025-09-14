@@ -1,8 +1,10 @@
 # backend/main.py
-from typing import List, Dict, Any, Tuple 
+from typing import List, Dict, Any, Tuple
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+import pandas as pd
+import ast
 
 # ---------- API contract ----------
 class GraphRequest(BaseModel):
@@ -14,8 +16,8 @@ class Node(BaseModel):
     year: int | None = None
     authors: List[str] | None = None
     outCitations: List[str] = []
-    score: float | int | None = None  # optional; used by frontend
-    abstract: str | None = None  # the abstract (doy)
+    score: float | int | None = None
+    abstract: str | None = None
 
 class Link(BaseModel):
     source: str
@@ -24,8 +26,8 @@ class Link(BaseModel):
 class GraphResponse(BaseModel):
     nodes: List[Node]
     links: List[Link]
-    shortest_distance: List[str]  
-    description: List[Tuple[str, str]] 
+    shortest_distance: List[str]
+    description: List[Tuple[str, str]]
 
 # ---------- app ----------
 app = FastAPI()
@@ -38,88 +40,137 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---------- paste your real logic here ----------
-def build_graph_for_doi(doi: str) -> Dict[str, Any]:
-    """
-    TODO: Replace this with your real Python pipeline:
-      - fetch metadata for `doi`
-      - fetch/scrape references/citations
-      - construct nodes (with optional `score`) and links
-    Return shape: { "nodes": [...], "links": [...] }
-    """
-    demo = {
-    "nodes": [
-        {
-            "id": "10.1038/nature14236",  # origin
-            "title": "Origin Paper",
-            "year": 2015,
-            "authors": ["Alpha A"],
-            "outCitations": ["10.1016/j.tins.2010.01.006", "10.1126/science.aaz1776"],
-            "score": 5,
-            "abstract": "Demo abstract for origin."
-        },
-        {
-            "id": "10.1016/j.tins.2010.01.006",  # path 1
-            "title": "Path Node 1",
-            "year": 2010,
-            "authors": ["Bravo B"],
-            "outCitations": ["10.1016/0306-4522(89)90423-5"],
-            "score": 3,
-            "abstract": "Demo abstract for path node 1."
-        },
-        {
-            "id": "10.1016/0306-4522(89)90423-5",  # path 2
-            "title": "Path Node 2",
-            "year": 1989,
-            "authors": ["Charlie C"],
-            "outCitations": ["10.1016/0304-3940(86)90466-0"],
-            "score": 2,
-            "abstract": "Demo abstract for path node 2."
-        },
-        {
-            "id": "10.1016/0304-3940(86)90466-0",  # endpoint
-            "title": "Endpoint Paper",
-            "year": 1986,
-            "authors": ["Delta D"],
-            "outCitations": [],
-            "score": 4,
-            "abstract": "Demo abstract for endpoint."
-        },
-        {
-            "id": "10.1126/science.aaz1776",  # distractor branch
-            "title": "Background Study A",
-            "year": 2019,
-            "authors": ["Patel R"],
-            "outCitations": ["10.1016/0304-3940(86)90466-0"],  # jumps to endpoint (non-path)
-            "score": 1,
-            "abstract": "Demo abstract A."
-        },
-        {
-            "id": "10.1016/j.cell.2020.12.015",  # unrelated
-            "title": "Background Study B",
-            "year": 2020,
-            "authors": ["Chen X", "Ng M"],
-            "outCitations": [],
-            "score": 1,
-            "abstract": "Demo abstract B."
-        },
-    ]
-}
-    # derive links from outCitations (same as mock)
-    ids = {n["id"] for n in demo["nodes"]}
-    links = [{"source": n["id"], "target": t} for n in demo["nodes"] for t in n.get("outCitations", []) if t in ids]
-    shortest_distance = ["10.1038/nature14236", "10.1016/j.tins.2010.01.006", "10.1016/0306-4522(89)90423-5", "10.1016/0304-3940(86)90466-0"]
-    description = [
-        ["10.1016/j.tins.2010.01.006", "description for path node 1"],
-        ["10.1016/j.cell.2020.12.015", "description for background study B"],
-    ]
+# ---------- dataset load (once) ----------
+CSV_PATH = "data/final_merged_with_abstracts.csv"
 
+def _norm_doi(x) -> str | None:
+    if isinstance(x, str):
+        s = x.strip()
+        return s.lower() if s else None
+    return None
+
+def _parse_refs(x) -> List[str]:
+    if not isinstance(x, str):
+        return []
+    try:
+        v = ast.literal_eval(x)
+    except Exception:
+        return []
+    if isinstance(v, (list, tuple, set)):
+        out = []
+        for item in v:
+            d = _norm_doi(item)
+            if isinstance(item, str) and d:
+                out.append(d)
+        return out
+    return []
+
+_df = pd.read_csv(CSV_PATH)
+
+# Universe of DOIs present in the dataset (normalized)
+_ID_SET = { _norm_doi(d) for d in _df["DOI"].dropna().tolist() }
+_ID_SET.discard(None)
+
+def _get_str(row, *keys) -> str | None:
+    for k in keys:
+        v = row.get(k)
+        if isinstance(v, str):
+            s = v.strip()
+            if s:
+                return s
+    return None
+
+# Build nodes
+_ALL_NODES: List[Dict[str, Any]] = []
+for _, row in _df.iterrows():
+    doi = _norm_doi(row.get("DOI"))
+    if not doi:
+        continue
+
+    refs = _parse_refs(row.get("References"))
+    # keep internal edges only
+    refs = [r for r in refs if r in _ID_SET]
+
+    authors_raw = _get_str(row, "Authors", "authors")
+    authors = [a.strip() for a in authors_raw.split(";")] if authors_raw else None
+
+    year_val = row.get("Year")
+    year = int(year_val) if pd.notna(year_val) else None
+
+    score_val = row.get("Score")
+    score = float(score_val) if pd.notna(score_val) else None
+
+    title = _get_str(row, "Title", "title")
+    abstract = _get_str(row, "Abstract", "abstract")
+
+    _ALL_NODES.append({
+        "id": doi,
+        "title": title if isinstance(title, str) else None,
+        "year": year,
+        "authors": authors,
+        "outCitations": refs,
+        "score": score,
+        "abstract": abstract if isinstance(abstract, str) else None,
+    })
+
+# Build links (source -> target) from outCitations
+_ALL_LINKS: List[Dict[str, str]] = [
+    {"source": n["id"], "target": t}
+    for n in _ALL_NODES
+    for t in n.get("outCitations", [])
+]
+
+from collections import defaultdict
+
+# Undirected adjacency for hop counting
+_ADJ = defaultdict(set)
+for e in _ALL_LINKS:
+    s, t = e["source"], e["target"]
+    _ADJ[s].add(t); _ADJ[t].add(s)
+
+def _gold_id_fallback() -> str:
+    # pick highest-score node, else first node
+    scored = [n for n in _ALL_NODES if isinstance(n.get("score"), (int, float))]
+    return (max(scored, key=lambda n: n["score"]) if scored else _ALL_NODES[0])["id"]
+
+def _bfs_ids(start_id: str | None, depth: int = 2, max_nodes: int = 600) -> set[str]:
+    start = _norm_doi(start_id)
+    if not start or start not in _ID_SET:
+        start = _gold_id_fallback()
+    keep = {start}
+    frontier = [start]
+    for _ in range(depth):
+        nxt = []
+        for u in frontier:
+            for v in _ADJ.get(u, ()):
+                if v not in keep:
+                    keep.add(v); nxt.append(v)
+                    if len(keep) >= max_nodes:
+                        break
+            if len(keep) >= max_nodes:
+                break
+        frontier = nxt
+        if not frontier or len(keep) >= max_nodes:
+            break
+    return keep
+
+# Curated per-DOI descriptions (pairs). Keep lowercased DOIs.
+_DESCRIPTION: List[Tuple[str, str]] = [
+    # ("10.1016/j.tins.2010.01.006", "description for path node 1"),
+    # ("10.1016/j.cell.2020.12.015", "description for background study B"),
+]
+
+# ---------- logic ----------
+def build_graph_for_doi(doi: str) -> Dict[str, Any]:
+    keep = _bfs_ids(doi, depth=2, max_nodes=600)  # tweak depth/max_nodes as needed
+    nodes = [n for n in _ALL_NODES if n["id"] in keep]
+    links = [e for e in _ALL_LINKS if e["source"] in keep and e["target"] in keep]
     return {
-    "nodes": demo["nodes"],
-    "links": links,
-    "shortest_distance": shortest_distance,
-    "description": description,
-}
+        "nodes": nodes,
+        "links": links,
+        "shortest_distance": [],   # you’ll fill this later
+        "description": _DESCRIPTION,
+    }
 
 # ---------- endpoint ----------
 @app.post("/api/graph", response_model=GraphResponse)

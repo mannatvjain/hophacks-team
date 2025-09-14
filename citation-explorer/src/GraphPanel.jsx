@@ -3,8 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 
 /* ----------------- star geometry (outside component) ----------------- */
-const STAR_OUTER = 9;  // tweak visual size of gold star
-const STAR_INNER = 4;
+const STAR_OUTER = 16;  // tweak visual size of gold star
+const STAR_INNER = 8;
 function starPath(cx, cy, spikes = 5, outerR = STAR_OUTER, innerR = STAR_INNER) {
   let path = "";
   const step = Math.PI / spikes;
@@ -108,6 +108,8 @@ export default function GraphPanel({
 
     const nodeRadius  = 5;
     const hoverRadius = 7;
+    const top10Radius = 13;
+    const top10Hover = 16;
     const gapOffset   = 4;                // modest clearance from node to link
 
     /* ------------------------- color helpers ------------------------- */
@@ -169,7 +171,7 @@ export default function GraphPanel({
     const node = nodeLayer.selectAll("circle")
       .data(nodes.filter(d => !isGold(d)), d => String(d.id))
       .join("circle")
-      .attr("r", nodeRadius)
+      .attr("r", d => inTop10(d) ? top10Radius : nodeRadius)
       .attr("fill", nodeFill)
       .attr("stroke", "white")
       .attr("stroke-width", 1.6)
@@ -184,7 +186,7 @@ export default function GraphPanel({
         }
       })
       .on("mouseover", function (_, d) {
-        d3.select(this).transition().duration(120).attr("r", hoverRadius).attr("fill", GREEN);
+        d3.select(this).transition().duration(120).attr("r", inTop10(d) ? top10Hover : hoverRadius).attr("fill", GREEN);
         const id = String(d.id);
         link.attr("stroke-opacity", (L) =>
           String(L.source.id ?? L.source) === id || String(L.target.id ?? L.target) === id ? 0.9 : 0.15
@@ -193,7 +195,7 @@ export default function GraphPanel({
         label.filter((ld) => ld === d).attr("opacity", 1);
       })
       .on("mouseout", function (_, d) {
-        d3.select(this).transition().duration(120).attr("r", nodeRadius).attr("fill", nodeFill(d));
+        d3.select(this).transition().duration(120).attr("r", inTop10(d) ? top10Radius : nodeRadius).attr("fill", nodeFill(d));
         link.attr("stroke-opacity", 0.55);
         node.attr("opacity", 1);
         label.attr("opacity", 0);
@@ -280,10 +282,14 @@ export default function GraphPanel({
 
     /* ---------------------------- forces ----------------------------- */
     sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink(links).id(d => String(d.id)).distance(70).strength(0.55))
-      .force("charge", d3.forceManyBody().strength(-320))
+      .force("link", d3.forceLink(links).id(d => String(d.id)).distance(32).strength(0.85))
+      .force("charge", d3.forceManyBody().strength(-180).distanceMax(450))
+      .force("x", d3.forceX(0).strength(0.05))
+      .force("y", d3.forceY(0).strength(0.05))
+
       .force("center", d3.forceCenter(0, 0))
-      .force("collision", d3.forceCollide().radius(12).iterations(2))
+
+      .force("collision", d3.forceCollide().radius(d => (inTop10(d) ? top10Radius : nodeRadius) + 3).iterations(2))
       .force("angular", forceAngularSpread(0.35, 0.03))
       .velocityDecay(0.25)
       .alpha(1)
