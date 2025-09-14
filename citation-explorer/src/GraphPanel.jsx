@@ -108,8 +108,8 @@ export default function GraphPanel({
 
     const nodeRadius  = 5;
     const hoverRadius = 7;
-    const top10Radius = 13;
-    const top10Hover = 16;
+    const top10Radius = 8;
+    const top10Hover = 10;
     const gapOffset   = 4;                // modest clearance from node to link
 
     /* ------------------------- color helpers ------------------------- */
@@ -282,7 +282,7 @@ export default function GraphPanel({
 
     /* ---------------------------- forces ----------------------------- */
     sim = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink(links).id(d => String(d.id)).distance(32).strength(0.85))
+      .force("link", d3.forceLink(links).id(d => String(d.id)).distance(48).strength(0.85))
       .force("charge", d3.forceManyBody().strength(-180).distanceMax(450))
       .force("x", d3.forceX(0).strength(0.05))
       .force("y", d3.forceY(0).strength(0.05))
