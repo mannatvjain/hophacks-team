@@ -40,13 +40,15 @@ export default function GraphPanel({
   const LABEL  = "#334155";
 
   useEffect(() => {
-    const { nodes, links, goldId, top10Ids, shortest_distance } = data;
+    const { nodes, links, goldId, top10Ids, shortest, pathEdgeKeys } = data;
     
     const pathEdges = new Set(
-      (shortest_distance ?? [])
-        .slice(0, -1)
-        .map((id, i) => `${shortest_distance[i]}->${shortest_distance[i + 1]}`)
-    );    
+      (pathEdgeKeys && pathEdgeKeys.length)
+        ? pathEdgeKeys
+        : (shortest_distance ?? [])
+            .slice(0, -1)
+            .map((_, i) => `${String(shortest_distance[i])}->${String(shortest_distance[i + 1])}`)
+    );      
 
     const svg  = d3.select(svgRef.current);
     const root = svg.select(".root");

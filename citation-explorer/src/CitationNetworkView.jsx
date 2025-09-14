@@ -47,10 +47,55 @@ export default function CitationNetworkView({ initialData, onBack }) {
         );
         const goldId = sorted.length ? String(sorted[0].id) : null;
         const top10Ids = new Set(sorted.slice(1, 11).map((n) => String(n.id)));
+        // ---- shortest paths (gold ↔ top-10) on UNDIRECTED topology ----
+// Directed link keys (for highlighting actual arrows)
+const linkKeys = new Set(links.map(l => `${l.source}->${l.target}`));
+
+// Undirected adjacency for BFS
+const adj = new Map(nodes.map(n => [n.id, new Set()]));
+for (const l of links) {
+  adj.get(l.source)?.add(l.target);
+  adj.get(l.target)?.add(l.source);
+}
+
+// BFS from goldId (fewest hops)
+const parents = new Map();
+const visited = new Set();
+const q = [];
+if (goldId) {
+  parents.set(goldId, null);
+  visited.add(goldId);
+  q.push(goldId);
+}
+while (q.length) {
+  const u = q.shift();
+  for (const v of adj.get(u) ?? []) {
+    if (!visited.has(v)) {
+      visited.add(v);
+      parents.set(v, u);
+      q.push(v);
+    }
+  }
+}
+
+// Reconstruct edges along gold→each orange path, keeping real arrow direction
+const pathEdgeKeys = new Set();
+for (const tid of top10Ids) {
+  if (tid === goldId) continue;
+  if (!parents.has(tid)) continue; // unreachable
+  let v = tid;
+  while (parents.get(v) != null) {
+    const u = parents.get(v);
+    const k1 = `${u}->${v}`, k2 = `${v}->${u}`;
+    if (linkKeys.has(k1)) pathEdgeKeys.add(k1);
+    else if (linkKeys.has(k2)) pathEdgeKeys.add(k2);
+    v = u;
+  }
+}
         const goldTitle = goldId ? (sorted[0].title || String(sorted[0].id)) : "Untitled";
         return {
           nodes, links, score, goldId, goldTitle, top10Ids, idMap,
-          shortest_distance: (initialData.shortest_distance ?? []).map(String), // <-- NEW
+          shortest_distance: (initialData.shortest_distance ?? []).map(String), pathEdgeKeys: [...pathEdgeKeys],
         };        
     }, [initialData]);
 
