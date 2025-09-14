@@ -1,5 +1,5 @@
 // src/GraphPanel.jsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as d3 from "d3";
 
 /* ----------------- star geometry (outside component) ----------------- */
@@ -40,7 +40,13 @@ export default function GraphPanel({
   const LABEL  = "#334155";
 
   useEffect(() => {
-    const { nodes, links, goldId, top10Ids } = data;
+    const { nodes, links, goldId, top10Ids, shortest_distance } = data;
+    
+    const pathEdges = new Set(
+      (shortest_distance ?? [])
+        .slice(0, -1)
+        .map((id, i) => `${shortest_distance[i]}->${shortest_distance[i + 1]}`)
+    );    
 
     const svg  = d3.select(svgRef.current);
     const root = svg.select(".root");
@@ -65,6 +71,20 @@ export default function GraphPanel({
       .attr("d", "M 0 0 L 12 6 L 0 12 L 3 6 Z") // wide wedge to cover link edges
       .attr("fill", ARROW);
 
+      defs.append("marker")
+      .attr("id", "arrow-orange")
+      .attr("markerUnits", "strokeWidth")
+      .attr("viewBox", "0 0 12 12")
+      .attr("refX", 9.5)
+      .attr("refY", 6)
+      .attr("markerWidth", 5)
+      .attr("markerHeight", 5)
+      .attr("orient", "auto")
+      .append("path")
+      .attr("d", "M 0 0 L 12 6 L 0 12 L 3 6 Z")
+      .attr("fill", ORANGE);
+    
+
     /* ---------------------------- layers ----------------------------- */
     const linkLayer  = root.append("g").attr("stroke", LINK).attr("stroke-opacity", 0.55);
     const nodeLayer  = root.append("g");
@@ -76,8 +96,15 @@ export default function GraphPanel({
       .data(links, d => `${d.source}->${d.target}`)
       .join("line")
       .attr("stroke-width", linkStroke)
-      .attr("stroke-linecap", "butt")    // avoid square extension past geometry
-      .attr("marker-end", "url(#arrow)");
+      .attr("stroke-linecap", "butt")
+      .attr("stroke", d => {
+        const key = `${String(d.source.id ?? d.source)}->${String(d.target.id ?? d.target)}`;
+        return pathEdges.has(key) ? ORANGE : LINK;
+      })
+      .attr("marker-end", d => {
+        const key = `${String(d.source.id ?? d.source)}->${String(d.target.id ?? d.target)}`;
+        return pathEdges.has(key) ? "url(#arrow-orange)" : "url(#arrow)";
+      });
 
     const nodeRadius  = 5;
     const hoverRadius = 7;

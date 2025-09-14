@@ -9,6 +9,7 @@ export default function CitationNetworkView({ initialData, onBack }) {
   const [fitSignal, setFitSignal] = useState(0);         // animated fit (Focus)
   const [recenterSignal, setRecenterSignal] = useState(0); // instant recenter (Refresh)
   const [readingIds, setReadingIds] = useState(new Set()); // persistent purple list
+  const [showPath, setShowPath] = useState(true); // NEW: toggle shortest-path rendering
 
   const data = useMemo(() => {
     const nodes = (initialData.nodes ?? []).map((d) => ({
@@ -38,7 +39,10 @@ export default function CitationNetworkView({ initialData, onBack }) {
         const goldId = sorted.length ? String(sorted[0].id) : null;
         const top10Ids = new Set(sorted.slice(1, 11).map((n) => String(n.id)));
         const goldTitle = goldId ? (sorted[0].title || String(sorted[0].id)) : "Untitled";
-        return { nodes, links, score, goldId, goldTitle, top10Ids, idMap };
+        return {
+          nodes, links, score, goldId, goldTitle, top10Ids, idMap,
+          shortest_distance: (initialData.shortest_distance ?? []).map(String), // <-- NEW
+        };        
     }, [initialData]);
 
   const jumpToId = (id) => {
@@ -120,6 +124,7 @@ export default function CitationNetworkView({ initialData, onBack }) {
         </div>
       </div>
 
+
       <div className="h-[calc(100vh-9.5rem)] grid grid-cols-[1fr_360px] gap-6">
         <div className="bg-white rounded-lg shadow-sm h-full">
           <GraphPanel
@@ -183,3 +188,5 @@ function ReadingStrip({ titles, onExport }) {
     </>
   );
 }
+
+

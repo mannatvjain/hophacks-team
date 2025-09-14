@@ -24,6 +24,7 @@ class Link(BaseModel):
 class GraphResponse(BaseModel):
     nodes: List[Node]
     links: List[Link]
+    shortest_distance: List[str]  # <-- NEW
 
 # ---------- app ----------
 app = FastAPI()
@@ -46,24 +47,78 @@ def build_graph_for_doi(doi: str) -> Dict[str, Any]:
     Return shape: { "nodes": [...], "links": [...] }
     """
     demo = {
-        "nodes": [
-            {
-                "id": "10.1038/s41586-020-03167-3",
-                "title": "Original Research Paper",
-                "year": 2021,
-                "authors": ["Smith J", "Lee K"],
-                "outCitations": ["10.1126/science.aaz1776", "10.1016/j.cell.2020.12.015"],
-                "score": 3,
-                "abstract": "Predicting protein properties is paramount for biological and medical advancements. Current protein engineering mutates on a typical protein, called the wild-type, to construct a family of homologous proteins and study their properties. Yet, existing methods easily neglect subtle mutations, failing to capture the effect on the protein properties. To this end, we propose EvolMPNN, Evolution-aware Message Passing Neural Network, an efficient model to learn evolution-aware protein embeddings. EvolMPNN samples sets of anchor proteins, computes evolutionary information by means of residues and employs a differentiable evolution-aware aggregation scheme over these sampled anchors. This way, EvolMPNN can efficiently utilise a novel message-passing method to capture the mutation effect on proteins with respect to the anchor proteins. Afterwards, the aggregated evolution-aware embeddings are integrated with sequence embeddings to generate final comprehensive protein embeddings. Our model shows up to 6.4 better than state-of-the-art methods and attains 36X inference speedup in comparison with large pre-trained models. Code and models are available at this https URL.Predicting protein properties is paramount for biological and medical advancements. Current protein engineering mutates on a typical protein, called the wild-type, to construct a family of homologous proteins and study their properties. Yet, existing methods easily neglect subtle mutations, failing to capture the effect on the protein properties. To this end, we propose EvolMPNN, Evolution-aware Message Passing Neural Network, an efficient model to learn evolution-aware protein embeddings. EvolMPNN samples sets of anchor proteins, computes evolutionary information by means of residues and employs a differentiable evolution-aware aggregation scheme over these sampled anchors. This way, EvolMPNN can efficiently utilise a novel message-passing method to capture the mutation effect on proteins with respect to the anchor proteins. Afterwards, the aggregated evolution-aware embeddings are integrated with sequence embeddings to generate final comprehensive protein embeddings. Our model shows up to 6.4 better than state-of-the-art methods and attains 36X inference speedup in comparison with large pre-trained models. Code and models are available at this https URL."
-            },
-            {"id": "10.1126/science.aaz1776", "title": "Background Study A", "year": 2019, "authors": ["Patel R"], "outCitations": [], "score": 1, "abstract": "This is a demo abstract for background study A."},
-            {"id": "10.1016/j.cell.2020.12.015", "title": "Background Study B", "year": 2020, "authors": ["Chen X", "Ng M"], "outCitations": [], "score": 1, "abstract": "This is a demo abstract for background study B."},
-        ]
-    }
+    "nodes": [
+        {
+            "id": "10.1038/nature14236",  # origin
+            "title": "Origin Paper",
+            "year": 2015,
+            "authors": ["Alpha A"],
+            "outCitations": ["10.1016/j.tins.2010.01.006", "10.1126/science.aaz1776"],
+            "score": 5,
+            "abstract": "Demo abstract for origin."
+        },
+        {
+            "id": "10.1016/j.tins.2010.01.006",  # path 1
+            "title": "Path Node 1",
+            "year": 2010,
+            "authors": ["Bravo B"],
+            "outCitations": ["10.1016/0306-4522(89)90423-5"],
+            "score": 3,
+            "abstract": "Demo abstract for path node 1."
+        },
+        {
+            "id": "10.1016/0306-4522(89)90423-5",  # path 2
+            "title": "Path Node 2",
+            "year": 1989,
+            "authors": ["Charlie C"],
+            "outCitations": ["10.1016/0304-3940(86)90466-0"],
+            "score": 2,
+            "abstract": "Demo abstract for path node 2."
+        },
+        {
+            "id": "10.1016/0304-3940(86)90466-0",  # endpoint
+            "title": "Endpoint Paper",
+            "year": 1986,
+            "authors": ["Delta D"],
+            "outCitations": [],
+            "score": 4,
+            "abstract": "Demo abstract for endpoint."
+        },
+        {
+            "id": "10.1126/science.aaz1776",  # distractor branch
+            "title": "Background Study A",
+            "year": 2019,
+            "authors": ["Patel R"],
+            "outCitations": ["10.1016/0304-3940(86)90466-0"],  # jumps to endpoint (non-path)
+            "score": 1,
+            "abstract": "Demo abstract A."
+        },
+        {
+            "id": "10.1016/j.cell.2020.12.015",  # unrelated
+            "title": "Background Study B",
+            "year": 2020,
+            "authors": ["Chen X", "Ng M"],
+            "outCitations": [],
+            "score": 1,
+            "abstract": "Demo abstract B."
+        },
+    ]
+}
     # derive links from outCitations (same as mock)
     ids = {n["id"] for n in demo["nodes"]}
     links = [{"source": n["id"], "target": t} for n in demo["nodes"] for t in n.get("outCitations", []) if t in ids]
-    return {"nodes": demo["nodes"], "links": links}
+    return {
+    "nodes": demo["nodes"],
+    "links": links,
+    # two-id dummy path (origin -> endpoint); replace later with your CSV array
+    "shortest_distance": [
+    "10.1038/nature14236",
+    "10.1016/j.tins.2010.01.006",
+    "10.1016/0306-4522(89)90423-5",
+    "10.1016/0304-3940(86)90466-0",
+],
+}
+
 
 # ---------- endpoint ----------
 @app.post("/api/graph", response_model=GraphResponse)
